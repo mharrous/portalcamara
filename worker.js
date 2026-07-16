@@ -18,6 +18,12 @@ const PROYECTOS = [
     estado: "activo",
   },
   {
+    nombre: "Portal Proyectos Innovación",
+    categoria: "Por definir",
+    url: "https://portalproyectoscamara.camaraceuta.workers.dev/",
+    estado: "activo",
+  },
+  {
     nombre: "Próximo proyecto",
     categoria: "Por definir",
     url: "",
@@ -450,7 +456,7 @@ function renderHtml() {
         <span class="logo-chip"><img src="${LOGO_CAMARA}" alt="Cámara de Ceuta"></span>
         <div>
           <p class="kicker">Cámara de Ceuta</p>
-          <h1>Portal de Proyectos</h1>
+          <h1>Portal</h1>
         </div>
       </div>
       <div class="stat">
