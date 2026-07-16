@@ -12,12 +12,6 @@ const PROYECTOS = [
     estado: "activo",
   },
   {
-    nombre: "Portal Proyecto Innovación",
-    categoria: "Interno",
-    url: "https://proyectos-innovacion.camaraceuta.workers.dev/",
-    estado: "activo",
-  },
-  {
     nombre: "Portal Proyectos Innovación",
     categoria: "Por definir",
     url: "https://portalproyectoscamara.camaraceuta.workers.dev/",
