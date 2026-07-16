@@ -13,7 +13,7 @@ const PROYECTOS = [
   },
   {
     nombre: "Portal Proyectos Innovación",
-    categoria: "Por definir",
+    categoria: "Proyectos",
     url: "https://portalproyectoscamara.camaraceuta.workers.dev/",
     estado: "activo",
   },
