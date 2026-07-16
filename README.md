@@ -24,18 +24,40 @@ Campos:
 - `url`: enlace completo. Si aún no existe, déjalo como `""`.
 - `estado`: usa `"activo"` o `"proximamente"`.
 
-## Despliegue manual en Cloudflare
+## Worker definitivo
 
-1. Abre Cloudflare Workers.
-2. Entra al Worker del portal.
-3. Pulsa `Edit code`.
-4. Selecciona todo con `Ctrl+A`.
-5. Pega el contenido completo de `worker.js`.
-6. Pulsa `Save and deploy`.
+El Worker definitivo debe ser:
 
-## URL actual
+- Nombre en Cloudflare: `portal`
+- URL: `https://portal.camaraceuta.workers.dev/`
+- Repositorio GitHub: `mharrous/portalcamara`
 
-- https://portal.camaraceuta.workers.dev/
+## Conectar este repo a Cloudflare
+
+En Cloudflare:
+
+1. Entra en `Workers & Pages`.
+2. Abre el Worker `portal`.
+3. Ve a `Settings` > `Builds`.
+4. Pulsa `Connect`.
+5. Selecciona GitHub y el repo `mharrous/portalcamara`.
+6. Configura:
+   - Branch: `main`
+   - Build command: vacío o `npm install`
+   - Deploy command: `npx wrangler deploy`
+   - Root directory: vacío / raíz del repo
+7. Guarda la configuración.
+
+A partir de ahí, cada `git push` a `main` desplegará el Worker `portal`.
+
+## Despliegue manual alternativo
+
+Si necesitas desplegar manualmente:
+
+```powershell
+npm install
+npx wrangler deploy
+```
 
 ## Seguridad
 

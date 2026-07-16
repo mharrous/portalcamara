@@ -1,0 +1,13 @@
+﻿{
+  "name": "portalcamara",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "check": "node --check worker.js"
+  },
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}
