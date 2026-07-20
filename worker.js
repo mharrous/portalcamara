@@ -12,9 +12,9 @@ const PROYECTOS = [
     estado: "activo",
   },
   {
-    nombre: "Portal Proyectos Innovación",
-    categoria: "Proyectos",
-    url: "https://portalproyectoscamara.camaraceuta.workers.dev/",
+    nombre: "Portal innovación",
+    categoria: "Innovación",
+    url: "#innovacion",
     estado: "activo",
   },
   {
@@ -22,6 +22,21 @@ const PROYECTOS = [
     categoria: "Por definir",
     url: "",
     estado: "proximamente",
+  },
+];
+
+const INNOVACION = [
+  {
+    nombre: "Portal de proyectos innovación",
+    categoria: "Proyectos",
+    url: "https://portalproyectoscamara.camaraceuta.workers.dev/",
+    estado: "activo",
+  },
+  {
+    nombre: "Portal jornadas",
+    categoria: "Jornadas",
+    url: "https://portal-jornadas.pages.dev/",
+    estado: "activo",
   },
 ];
 
@@ -48,6 +63,7 @@ export default {
 
 function renderHtml() {
   const proyectosJson = JSON.stringify(PROYECTOS, null, 2).replace(/</g, "\u003c");
+  const innovacionJson = JSON.stringify(INNOVACION, null, 2).replace(/</g, "\u003c");
 
   return `<!doctype html>
 <html lang="es">
@@ -206,7 +222,7 @@ function renderHtml() {
 
     .controls {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 220px;
+      grid-template-columns: minmax(0, 1fr) 220px 148px;
       gap: 14px;
       margin-bottom: 28px;
     }
@@ -259,6 +275,27 @@ function renderHtml() {
       border-color: var(--red);
       box-shadow: 0 0 0 4px rgba(225, 29, 47, 0.08);
     }
+
+    .back-button {
+      height: 52px;
+      border: 1px solid rgba(11, 45, 77, 0.18);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--navy);
+      font: 700 13px "Inter", sans-serif;
+      cursor: pointer;
+      box-shadow: 0 10px 26px rgba(11, 45, 77, 0.07);
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .back-button:hover,
+    .back-button:focus-visible {
+      border-color: rgba(225, 29, 47, 0.42);
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    .back-button[hidden] { display: none; }
 
     .grid {
       display: grid;
@@ -450,7 +487,7 @@ function renderHtml() {
         <span class="logo-chip"><img src="${LOGO_CAMARA}" alt="Cámara de Ceuta"></span>
         <div>
           <p class="kicker">Cámara de Ceuta</p>
-          <h1>Portal</h1>
+          <h1 id="portalTitle">Portal</h1>
         </div>
       </div>
       <div class="stat">
@@ -471,6 +508,8 @@ function renderHtml() {
       <select id="categoryFilter" class="field-select" aria-label="Filtrar por categoría">
         <option value="todas">Todas las categorías</option>
       </select>
+
+      <button id="backButton" class="back-button" type="button" hidden>← Volver</button>
     </section>
 
     <section class="grid" aria-label="Listado de proyectos" id="projectGrid"></section>
@@ -484,12 +523,15 @@ function renderHtml() {
 
   <script>
     const PROYECTOS = ${proyectosJson};
+    const INNOVACION = ${innovacionJson};
     const gridContainer = document.getElementById("projectGrid");
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
     const emptyState = document.getElementById("emptyState");
     const liveCountEl = document.getElementById("liveCount");
     const todayLabel = document.getElementById("today");
+    const portalTitle = document.getElementById("portalTitle");
+    const backButton = document.getElementById("backButton");
 
     function removeInstallPromptArtifacts() {
       document.querySelectorAll("body *").forEach(function(element) {
@@ -517,6 +559,18 @@ function renderHtml() {
       return projectIsActive(project) ? "En línea" : "Próximamente";
     }
 
+    function isInnovationView() {
+      return window.location.hash === "#innovacion";
+    }
+
+    function currentProjects() {
+      return isInnovationView() ? INNOVACION : PROYECTOS;
+    }
+
+    function isInternalProject(project) {
+      return String(project.url || "").startsWith("#");
+    }
+
     function initial(name) {
       return String(name || "?").trim().charAt(0).toUpperCase();
     }
@@ -534,9 +588,18 @@ function renderHtml() {
 
       if (isLive) {
         card.href = project.url;
-        card.target = "_blank";
-        card.rel = "noopener noreferrer";
-        card.setAttribute("aria-label", "Abrir " + project.nombre + " en una pestaña nueva");
+
+        if (isInternalProject(project)) {
+          card.setAttribute("aria-label", "Entrar en " + project.nombre);
+          card.addEventListener("click", function(event) {
+            event.preventDefault();
+            window.location.hash = project.url;
+          });
+        } else {
+          card.target = "_blank";
+          card.rel = "noopener noreferrer";
+          card.setAttribute("aria-label", "Abrir " + project.nombre + " en una pestaña nueva");
+        }
       }
 
       card.className = "card " + (isLive ? "card-live" : "card-soon");
@@ -554,8 +617,9 @@ function renderHtml() {
 
       const foot = document.createElement("div");
       foot.className = "card-foot";
+      const ctaLabel = isLive ? (isInternalProject(project) ? "Entrar →" : "Abrir ↗") : "—";
       foot.appendChild(createTextElement("span", "card-status", statusLabel(project)));
-      foot.appendChild(createTextElement("span", "card-cta", isLive ? "Abrir ↗" : "—"));
+      foot.appendChild(createTextElement("span", "card-cta", ctaLabel));
 
       card.appendChild(top);
       card.appendChild(body);
@@ -563,8 +627,10 @@ function renderHtml() {
       return card;
     }
 
-    function fillCategoryFilter() {
-      const categories = Array.from(new Set(PROYECTOS.map(function(project) { return project.categoria; })))
+    function fillCategoryFilter(projects) {
+      categoryFilter.innerHTML = '<option value="todas">Todas las categorías</option>';
+
+      const categories = Array.from(new Set(projects.map(function(project) { return project.categoria; })))
         .sort(function(first, second) { return first.localeCompare(second, "es"); });
 
       categories.forEach(function(category) {
@@ -579,7 +645,7 @@ function renderHtml() {
       const query = normalizeText(searchInput.value);
       const category = categoryFilter.value;
 
-      return PROYECTOS.filter(function(project) {
+      return currentProjects().filter(function(project) {
         const matchesCategory = category === "todas" || project.categoria === category;
         const searchableText = normalizeText([
           project.nombre,
@@ -593,6 +659,18 @@ function renderHtml() {
     }
 
     function renderProjects() {
+      const viewKey = isInnovationView() ? "innovacion" : "portal";
+      const projectsSource = currentProjects();
+
+      if (categoryFilter.dataset.view !== viewKey) {
+        categoryFilter.dataset.view = viewKey;
+        searchInput.value = "";
+        fillCategoryFilter(projectsSource);
+      }
+
+      portalTitle.textContent = isInnovationView() ? "Portal innovación" : "Portal";
+      backButton.hidden = !isInnovationView();
+
       const projects = filteredProjects();
       gridContainer.innerHTML = "";
       emptyState.hidden = projects.length > 0;
@@ -601,10 +679,14 @@ function renderHtml() {
         gridContainer.appendChild(createProjectCard(project, index));
       });
 
-      liveCountEl.textContent = PROYECTOS.filter(projectIsActive).length;
+      liveCountEl.textContent = projectsSource.filter(projectIsActive).length;
     }
 
-    fillCategoryFilter();
+    backButton.addEventListener("click", function() {
+      window.location.hash = "";
+    });
+
+    window.addEventListener("hashchange", renderProjects);
     renderProjects();
     removeInstallPromptArtifacts();
 
