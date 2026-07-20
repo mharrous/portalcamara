@@ -552,7 +552,7 @@ function renderHtml() {
 
     function projectIsActive(project) {
       const url = String(project.url || "").trim();
-      return project.estado === "activo" && (url.startsWith("https://") || url.startsWith("http://"));
+      return project.estado === "activo" && (url.startsWith("https://") || url.startsWith("http://") || url.startsWith("#"));
     }
 
     function statusLabel(project) {
