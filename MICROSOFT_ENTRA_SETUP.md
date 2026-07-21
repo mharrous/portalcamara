@@ -40,6 +40,14 @@ No almacenes valores reales en GitHub, `.dev.vars.example`, documentación ni re
 5. Comprueba un usuario permitido, uno no registrado, uno desactivado y uno de otro tenant.
 6. Mantén el acceso local hasta integrar y probar las aplicaciones dependientes.
 
+## Acceso local de emergencia
+
+El formulario local queda oculto en el acceso normal. Mientras `LOCAL_LOGIN_ENABLED=true`, solo aparece en:
+
+`https://portal.camaraceuta.workers.dev/login?local=1`
+
+Se recomienda conservarlo hasta comprobar que todas las aplicaciones dependientes funcionan con Microsoft y que existen al menos dos administradores corporativos. Después puede establecerse `LOCAL_LOGIN_ENABLED=false` y eliminarse `AUTH_USERS` y `AUTH_SECRET` de Cloudflare.
+
 ## Reversión
 
 1. Cambia `ENTRA_ENABLED` a `false`.

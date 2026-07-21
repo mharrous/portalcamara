@@ -16,10 +16,11 @@ export function authConfigurationError(env) {
   return "";
 }
 
-export function loginOptions(env) {
+export function loginOptions(env, showLocal = false) {
+  const microsoftEnabled = entraEnabled(env);
   return {
-    microsoftEnabled: entraEnabled(env),
-    localEnabled: localLoginEnabled(env),
+    microsoftEnabled,
+    localEnabled: localLoginEnabled(env) && (showLocal || !microsoftEnabled),
     microsoftStartPath: MICROSOFT_START_PATH,
   };
 }
@@ -50,6 +51,10 @@ export async function handleAuthRoute(request, env, renderers) {
   }
   if (url.pathname === "/api/admin/permissions" && request.method === "POST") {
     return withAdmin(request, env, (admin) => savePermission(request, env, admin));
+  }
+  const deleteUserMatch = url.pathname.match(/^\/api\/admin\/users\/(\d+)$/);
+  if (deleteUserMatch && request.method === "DELETE") {
+    return withAdmin(request, env, (admin) => deleteUser(Number(deleteUserMatch[1]), env, admin));
   }
   return null;
 }
@@ -354,6 +359,20 @@ async function savePermission(request, env, admin) {
   return json({ ok: true });
 }
 
+async function deleteUser(userId, env, admin) {
+  if (!userId) throw new Error("Usuario no válido.");
+  if (userId === admin.id) throw new Error("No puedes borrar tu propio usuario.");
+  const target = await env.AUTH_DB.prepare("SELECT id, display_name, role, active FROM users WHERE id = ?").bind(userId).first();
+  if (!target) throw new Error("Usuario no encontrado.");
+  if (target.role === "admin" && Number(target.active)) {
+    const count = await env.AUTH_DB.prepare("SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND active = 1").first();
+    if (Number(count?.total || 0) <= 1) throw new Error("Debe permanecer al menos un administrador activo.");
+  }
+  await audit(env, admin.id, "user.delete", "user", String(userId), { displayName: target.display_name });
+  await env.AUTH_DB.prepare("DELETE FROM users WHERE id = ?").bind(userId).run();
+  return json({ ok: true });
+}
+
 async function audit(env, actorUserId, action, targetType, targetId, detail) {
   await env.AUTH_DB.prepare(`
     INSERT INTO audit_log (actor_user_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)
@@ -363,13 +382,14 @@ async function audit(env, actorUserId, action, targetType, targetId, detail) {
 function renderAdminPage(user) {
   const safeName = escapeHtml(user.displayName || user.username || "Administrador");
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Usuarios y permisos</title><style>
-  :root{font-family:Inter,system-ui,sans-serif;color:#17202a;background:#f6f3ee}*{box-sizing:border-box}body{margin:0}.wrap{width:min(1180px,calc(100% - 32px));margin:32px auto}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}h1{margin:0;color:#8f1724}.button,button{border:0;border-radius:12px;padding:11px 16px;background:#a7192b;color:white;font-weight:800;text-decoration:none;cursor:pointer}.secondary{background:#fff;color:#25364a;border:1px solid #d9d0c5}.panel{background:#fff;border:1px solid #e3d9ce;border-radius:20px;padding:22px;box-shadow:0 16px 40px rgba(31,41,55,.08)}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px 9px;border-bottom:1px solid #eee4da;vertical-align:top}input,select{width:100%;padding:9px;border:1px solid #d8cec2;border-radius:9px;background:white}.apps{display:grid;gap:7px;min-width:260px}.perm{display:grid;grid-template-columns:22px 1fr 90px;align-items:center;gap:7px}.notice{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fff4ce;color:#684d00}.muted{color:#6b7280;font-size:13px}@media(max-width:850px){.table-wrap{overflow:auto}table{min-width:950px}}</style></head><body><main class="wrap"><div class="top"><div><p class="muted">Sesión: ${safeName}</p><h1>Usuarios y permisos</h1></div><a class="button secondary" href="/">Volver al portal</a></div><div id="notice" class="notice" hidden></div><section class="panel"><button id="newUser">Añadir usuario</button><div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Email Microsoft</th><th>Acceso</th><th>Estado</th><th>Aplicaciones</th><th></th></tr></thead><tbody id="users"></tbody></table></div></section></main><script>
+  :root{font-family:Inter,system-ui,sans-serif;color:#17202a;background:#f6f3ee}*{box-sizing:border-box}body{margin:0}.wrap{width:min(1180px,calc(100% - 32px));margin:32px auto}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}h1{margin:0;color:#8f1724}.button,button{border:0;border-radius:12px;padding:11px 16px;background:#a7192b;color:white;font-weight:800;text-decoration:none;cursor:pointer}.secondary{background:#fff;color:#25364a;border:1px solid #d9d0c5}.danger{background:#fff;color:#a7192b;border:1px solid #d8a5ad}.actions{display:grid;gap:8px}.panel{background:#fff;border:1px solid #e3d9ce;border-radius:20px;padding:22px;box-shadow:0 16px 40px rgba(31,41,55,.08)}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px 9px;border-bottom:1px solid #eee4da;vertical-align:top}input,select{width:100%;padding:9px;border:1px solid #d8cec2;border-radius:9px;background:white}.apps{display:grid;gap:10px;min-width:230px}.perm{display:grid;grid-template-columns:22px 1fr;align-items:center;gap:7px}.notice{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fff4ce;color:#684d00}.muted{color:#6b7280;font-size:13px}@media(max-width:850px){.table-wrap{overflow:auto}table{min-width:850px}}</style></head><body><main class="wrap"><div class="top"><div><p class="muted">Sesión: ${safeName}</p><h1>Usuarios y permisos</h1></div><a class="button secondary" href="/">Volver al portal</a></div><div id="notice" class="notice" hidden></div><section class="panel"><button id="newUser">Añadir usuario</button><div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Email Microsoft</th><th>Acceso</th><th>Estado</th><th>Aplicaciones</th><th></th></tr></thead><tbody id="users"></tbody></table></div></section></main><script>
   let data={users:[],applications:[],permissions:[]};const tbody=document.querySelector('#users');const notice=document.querySelector('#notice');
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function permission(userId,code){return data.permissions.find(p=>Number(p.user_id)===Number(userId)&&p.application_code===code);}
-  function draw(){tbody.innerHTML='';data.users.forEach(user=>{const row=document.createElement('tr');row.innerHTML='<td><input data-field="displayName" value="'+esc(user.display_name)+'"><input data-field="legacyUsername" placeholder="Usuario local opcional" value="'+esc(user.legacy_username||'')+'"><span class="muted">'+esc(user.auth_provider)+'</span></td><td><input data-field="email" type="email" placeholder="nombre@empresa.es" value="'+esc(user.email||'')+'"></td><td><select data-field="role"><option value="user">Usuario</option><option value="admin">Administrador</option></select></td><td><select data-field="active"><option value="1">Activo</option><option value="0">Desactivado</option></select></td><td><div class="apps">'+data.applications.map(app=>{const p=permission(user.id,app.code);return '<label class="perm"><input type="checkbox" data-app="'+esc(app.code)+'" '+(p&&Number(p.active)?'checked':'')+'><span>'+esc(app.name)+'</span><input data-app-role="'+esc(app.code)+'" value="'+esc(p?.role||'user')+'" aria-label="Rol"></label>';}).join('')+'</div></td><td><button data-save>Guardar</button></td>';row.querySelector('[data-field="role"]').value=user.role;row.querySelector('[data-field="active"]').value=String(Number(user.active));row.querySelector('[data-save]').onclick=()=>save(row,user);tbody.appendChild(row);});}
+  function draw(){tbody.innerHTML='';data.users.forEach(user=>{const row=document.createElement('tr');row.innerHTML='<td><input data-field="displayName" value="'+esc(user.display_name)+'"><span class="muted">'+(user.entra_oid?'Microsoft vinculado':'Pendiente de primer acceso Microsoft')+'</span></td><td><input data-field="email" type="email" placeholder="nombre@empresa.es" value="'+esc(user.email||'')+'"></td><td><select data-field="role"><option value="user">Usuario</option><option value="admin">Administrador</option></select></td><td><select data-field="active"><option value="1">Activo</option><option value="0">Desactivado</option></select></td><td><div class="apps">'+data.applications.map(app=>{const p=permission(user.id,app.code);return '<label class="perm"><input type="checkbox" data-app="'+esc(app.code)+'" '+(p&&Number(p.active)?'checked':'')+'><span>'+esc(app.name)+'</span></label>';}).join('')+'</div></td><td><div class="actions"><button data-save>Guardar</button><button class="danger" data-delete>Borrar</button></div></td>';row.querySelector('[data-field="role"]').value=user.role;row.querySelector('[data-field="active"]').value=String(Number(user.active));row.querySelector('[data-save]').onclick=()=>save(row,user);row.querySelector('[data-delete]').onclick=()=>removeUser(user);tbody.appendChild(row);});}
   async function load(){const response=await fetch('/api/admin/users');if(!response.ok)throw new Error('No se pudieron cargar los usuarios.');data=await response.json();draw();}
-  async function save(row,user){const body={id:user.id,displayName:row.querySelector('[data-field="displayName"]').value,email:row.querySelector('[data-field="email"]').value,legacyUsername:row.querySelector('[data-field="legacyUsername"]').value,role:row.querySelector('[data-field="role"]').value,active:row.querySelector('[data-field="active"]').value==='1'};const response=await fetch('/api/admin/users',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!response.ok){const problem=await response.json();return show(problem.error||'No se pudo guardar.');}for(const app of data.applications){await fetch('/api/admin/permissions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({userId:user.id,applicationCode:app.code,role:row.querySelector('[data-app-role="'+app.code+'"]').value,active:row.querySelector('[data-app="'+app.code+'"]').checked})});}show('Cambios guardados y aplicados a la base de datos.');await load();}
+  async function save(row,user){const body={id:user.id,displayName:row.querySelector('[data-field="displayName"]').value,email:row.querySelector('[data-field="email"]').value,legacyUsername:user.legacy_username||'',role:row.querySelector('[data-field="role"]').value,active:row.querySelector('[data-field="active"]').value==='1'};const response=await fetch('/api/admin/users',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!response.ok){const problem=await response.json();return show(problem.error||'No se pudo guardar.');}for(const app of data.applications){await fetch('/api/admin/permissions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({userId:user.id,applicationCode:app.code,role:'user',active:row.querySelector('[data-app="'+app.code+'"]').checked})});}show('Cambios guardados y aplicados a la base de datos.');await load();}
+  async function removeUser(user){if(!confirm('¿Borrar definitivamente a '+user.display_name+'? Se cerrarán sus sesiones y se eliminarán sus permisos.'))return;const response=await fetch('/api/admin/users/'+user.id,{method:'DELETE'});if(!response.ok){const problem=await response.json();return show(problem.error||'No se pudo borrar.');}show('Usuario borrado.');await load();}
   function show(message){notice.textContent=message;notice.hidden=false;}
   document.querySelector('#newUser').onclick=async()=>{const displayName=prompt('Nombre del usuario');if(!displayName)return;const email=prompt('Correo corporativo de Microsoft')||'';const response=await fetch('/api/admin/users',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({displayName,email,role:'user',active:true})});if(!response.ok){const problem=await response.json();return show(problem.error||'No se pudo crear.');}await load();};load().catch(error=>show(error.message));
   </script></body></html>`;

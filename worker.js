@@ -86,12 +86,15 @@ export default {
       if (request.method === "GET") {
         const sessionUser = await getDatabaseSessionUser(request, env);
         if (sessionUser) return redirectResponse("/");
-        return htmlResponse(renderLogin({ next: url.searchParams.get("next") || "/", ...loginOptions(env) }));
+        return htmlResponse(renderLogin({
+          next: url.searchParams.get("next") || "/",
+          ...loginOptions(env, url.searchParams.get("local") === "1"),
+        }));
       }
 
       if (request.method === "POST") {
         return loginWithPassword(request, env, (state, status = 200) =>
-          htmlResponse(renderLogin({ ...state, ...loginOptions(env) }), { status })
+          htmlResponse(renderLogin({ ...state, ...loginOptions(env, true) }), { status })
         );
       }
 

@@ -3,11 +3,12 @@
   "name": "portal",
   "main": "worker.js",
   "compatibility_date": "2026-07-21",
+  "keep_vars": true,
   "observability": {
     "enabled": true
   },
   "vars": {
-    "ENTRA_ENABLED": "false",
+    "ENTRA_ENABLED": "true",
     "ENTRA_REDIRECT_URI": "https://portal.camaraceuta.workers.dev/api/auth/microsoft/callback",
     "LOCAL_LOGIN_ENABLED": "true"
   },
