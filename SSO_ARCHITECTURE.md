@@ -18,8 +18,8 @@ Las sesiones se guardan en D1 mediante el hash de un token aleatorio. El navegad
 | --- | --- | --- |
 | `calendario-eventos` | `https://calendario.camaradeceuta.workers.dev/` | Externa o fuente pendiente; no protegida por el portal |
 | `reuniones` | `https://reuniones.camaraceuta.workers.dev/` | Controlada; acceso automático desde el portal mediante código de un solo uso |
-| `portal-proyectos-innovacion` | `https://portalproyectoscamara.camaraceuta.workers.dev/` | Controlada; mantiene su login local actual |
-| `gestion-jornadas` | `https://portal-jornadas.pages.dev/` | Controlada; mantiene su login local actual y Entra desactivado |
+| `portal-proyectos-innovacion` | `https://portalproyectoscamara.camaraceuta.workers.dev/` | Controlada; acceso automático desde el portal mediante código de un solo uso |
+| `gestion-jornadas` | `https://portal-jornadas.pages.dev/` | Controlada; acceso automático desde el portal mediante código de un solo uso |
 
 Las aplicaciones están en dominios `workers.dev` y `pages.dev` distintos. No se comparte la cookie del portal. La integración completa usa Authorization Code Flow con PKCE en cada aplicación, una cookie local propia y una consulta al permiso central usando un código de aplicación fijo.
 

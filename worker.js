@@ -112,7 +112,12 @@ export default {
     }
 
     const allowedCodes = await allowedApplicationCodes(sessionUser, env);
-    const innovationProjects = INNOVACION.filter((project) => allowedCodes.has(project.codigo));
+    const innovationProjects = INNOVACION
+      .filter((project) => allowedCodes.has(project.codigo))
+      .map((project) => ({
+        ...project,
+        url: `https://portal.camaraceuta.workers.dev/api/apps/${project.codigo}/launch`,
+      }));
     const projects = PROYECTOS.filter((project) => {
       if (project.codigo === "innovacion") return innovationProjects.length > 0;
       return allowedCodes.has(project.codigo);
