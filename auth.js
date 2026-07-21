@@ -1,5 +1,5 @@
 const SESSION_COOKIE = "portal_session";
-const SESSION_TTL_SECONDS = 8 * 60 * 60;
+const SESSION_TTL_SECONDS = 180 * 24 * 60 * 60;
 const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 const MICROSOFT_START_PATH = "/api/auth/microsoft/start";
 const MICROSOFT_CALLBACK_PATH = "/api/auth/microsoft/callback";
