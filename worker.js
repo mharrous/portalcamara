@@ -450,8 +450,18 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
   const proyectosJson = JSON.stringify(projects, null, 2).replace(/</g, "\u003c");
   const innovacionJson = JSON.stringify(innovationProjects, null, 2).replace(/</g, "\u003c");
   const sessionLabel = escapeHtml(sessionUser?.displayName || sessionUser?.username || "Usuario");
+  const sessionInitials = escapeHtml(
+    String(sessionUser?.displayName || sessionUser?.username || "Usuario")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0))
+      .join("")
+      .toUpperCase()
+  );
   const roleLabel = escapeHtml(sessionUser?.role === "admin" ? "Admin" : "Usuario");
-  const adminLink = sessionUser?.role === "admin" ? `<a href="/admin/users">Usuarios</a>` : "";
+  const adminLink = sessionUser?.role === "admin" ? `<a class="session-link" href="/admin/users">Usuarios</a>` : "";
 
   return `<!doctype html>
 <html lang="es">
@@ -582,13 +592,115 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       color: var(--navy);
     }
 
+    .header-actions {
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    .session-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 16px;
+      min-width: 390px;
+      padding: 9px 11px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 10px 28px rgba(11, 45, 77, 0.08);
+    }
+
+    .session-identity {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .session-avatar {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, rgba(195, 0, 36, 0.12), rgba(255, 214, 0, 0.2));
+      color: var(--red);
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .session-copy {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .session-name {
+      overflow: hidden;
+      color: var(--navy);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.2;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .session-role {
+      align-self: flex-start;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(11, 45, 77, 0.07);
+      color: var(--text-soft);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      line-height: 1.5;
+      text-transform: uppercase;
+    }
+
+    .session-links {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-left: 12px;
+      border-left: 1px solid var(--border);
+    }
+
+    .session-link {
+      padding: 7px 9px;
+      border-radius: 10px;
+      color: var(--navy);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .session-link:hover,
+    .session-link:focus-visible {
+      background: rgba(11, 45, 77, 0.06);
+      color: var(--red);
+    }
+
+    .logout-link {
+      color: var(--red);
+    }
+
     .stat {
       display: flex;
-      align-items: baseline;
-      gap: 8px;
-      padding: 10px 20px;
+      min-width: 82px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      padding: 8px 13px;
       border: 1px solid var(--border);
-      border-radius: 999px;
+      border-radius: 18px;
       background: rgba(255, 255, 255, 0.86);
       box-shadow: 0 10px 28px rgba(11, 45, 77, 0.08);
     }
@@ -854,6 +966,33 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
     @media (max-width: 640px) {
       .controls { grid-template-columns: 1fr; }
       .topbar { align-items: flex-start; }
+      .header-actions {
+        width: 100%;
+        flex-direction: column;
+      }
+      .session-card { min-width: 0; }
+      .stat {
+        width: fit-content;
+        min-width: 0;
+        flex-direction: row;
+        gap: 8px;
+        padding: 8px 14px;
+        border-radius: 999px;
+      }
+    }
+
+    @media (max-width: 440px) {
+      .session-card {
+        grid-template-columns: 1fr;
+        gap: 9px;
+      }
+      .session-links {
+        justify-content: flex-end;
+        padding-top: 8px;
+        padding-left: 0;
+        border-top: 1px solid var(--border);
+        border-left: 0;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -880,10 +1019,17 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       </div>
       <div class="header-actions">
         <div class="session-card" aria-label="Sesión iniciada">
-          <span>${sessionLabel}</span>
-          <strong>${roleLabel}</strong>
-          ${adminLink}
-          <a href="${LOGOUT_PATH}">Salir</a>
+          <div class="session-identity">
+            <span class="session-avatar" aria-hidden="true">${sessionInitials}</span>
+            <div class="session-copy">
+              <span class="session-name">${sessionLabel}</span>
+              <strong class="session-role">${roleLabel}</strong>
+            </div>
+          </div>
+          <nav class="session-links" aria-label="Acciones de sesión">
+            ${adminLink}
+            <a class="session-link logout-link" href="${LOGOUT_PATH}">Salir</a>
+          </nav>
         </div>
         <div class="stat">
           <span class="stat-value" id="liveCount">0</span>
