@@ -4,4 +4,11 @@ Thumbs.db
 .env.*
 node_modules/
 .wrangler/
+.wrangler-dry-run/
 .dev.vars
+.auth-local-secret.json
+*.log
+_*.js
+_*.cjs
+_*.mjs
+_*.tmp
