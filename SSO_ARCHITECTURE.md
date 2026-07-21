@@ -17,13 +17,15 @@ Las sesiones se guardan en D1 mediante el hash de un token aleatorio. El navegad
 | Código | URL | Estado |
 | --- | --- | --- |
 | `calendario-eventos` | `https://calendario.camaradeceuta.workers.dev/` | Externa o fuente pendiente; no protegida por el portal |
-| `reuniones` | `https://reuniones.camaraceuta.workers.dev/` | Controlada; protección Microsoft pendiente de activar |
+| `reuniones` | `https://reuniones.camaraceuta.workers.dev/` | Controlada; acceso automático desde el portal mediante código de un solo uso |
 | `portal-proyectos-innovacion` | `https://portalproyectoscamara.camaraceuta.workers.dev/` | Controlada; mantiene su login local actual |
 | `gestion-jornadas` | `https://portal-jornadas.pages.dev/` | Controlada; mantiene su login local actual y Entra desactivado |
 
 Las aplicaciones están en dominios `workers.dev` y `pages.dev` distintos. No se comparte la cookie del portal. La integración completa usa Authorization Code Flow con PKCE en cada aplicación, una cookie local propia y una consulta al permiso central usando un código de aplicación fijo.
 
 Ocultar una tarjeta no protege la URL de destino. Hasta activar la autenticación independiente en cada aplicación, su estado debe considerarse pendiente.
+
+Reuniones utiliza un código aleatorio de un solo uso, vinculado al usuario y a `reuniones`, con 45 segundos de validez. La aplicación lo consume de forma atómica y crea una cookie propia; nunca se envían contraseñas ni JWT en la URL.
 
 ## Compatibilidad local
 

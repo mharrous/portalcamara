@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS oauth_states (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS login_codes (
+  code_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  application_code TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (application_code) REFERENCES applications(code) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   actor_user_id INTEGER,
@@ -76,6 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_permissions_user ON user_application_permissions(user_id, active);
 CREATE INDEX IF NOT EXISTS idx_users_entra ON users(entra_tenant_id, entra_oid);
+CREATE INDEX IF NOT EXISTS idx_login_codes_expiry ON login_codes(expires_at);
 
 INSERT INTO applications (code, name, category, url, active, controlled, integration_status)
 VALUES

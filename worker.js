@@ -116,7 +116,9 @@ export default {
     const projects = PROYECTOS.filter((project) => {
       if (project.codigo === "innovacion") return innovationProjects.length > 0;
       return allowedCodes.has(project.codigo);
-    });
+    }).map((project) => project.codigo === "reuniones"
+      ? { ...project, url: "https://portal.camaraceuta.workers.dev/api/apps/reuniones/launch" }
+      : project);
     return htmlResponse(renderHtml(sessionUser, projects, innovationProjects));
   },
 };

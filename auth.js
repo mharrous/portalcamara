@@ -28,6 +28,11 @@ export function loginOptions(env, showLocal = false) {
 export async function handleAuthRoute(request, env, renderers) {
   const url = new URL(request.url);
 
+  const applicationLaunchMatch = url.pathname.match(/^\/api\/apps\/([a-z0-9-]+)\/launch$/);
+  if (applicationLaunchMatch && request.method === "GET") {
+    return launchApplication(request, env, applicationLaunchMatch[1]);
+  }
+
   if (url.pathname === MICROSOFT_START_PATH && request.method === "GET") {
     return beginMicrosoftLogin(request, env);
   }
@@ -57,6 +62,34 @@ export async function handleAuthRoute(request, env, renderers) {
     return withAdmin(request, env, (admin) => deleteUser(Number(deleteUserMatch[1]), env, admin));
   }
   return null;
+}
+
+async function launchApplication(request, env, applicationCode) {
+  const user = await getSessionUser(request, env);
+  if (!user) return redirect(`/login?next=${encodeURIComponent(new URL(request.url).pathname)}`);
+  const application = await env.AUTH_DB.prepare(`
+    SELECT a.code, a.url
+    FROM applications a
+    LEFT JOIN user_application_permissions p
+      ON p.application_code = a.code AND p.user_id = ?
+    WHERE a.code = ? AND a.active = 1
+      AND (? = 'admin' OR (p.active = 1))
+  `).bind(user.id, applicationCode, user.role).first();
+  if (!application) return new Response("Acceso denegado", { status: 403 });
+
+  const destination = new URL(application.url);
+  if (destination.protocol !== "https:") return new Response("Destino no válido", { status: 500 });
+  const code = randomToken(32);
+  const expiresAt = new Date(Date.now() + 45 * 1000).toISOString();
+  await env.AUTH_DB.batch([
+    env.AUTH_DB.prepare("DELETE FROM login_codes WHERE expires_at <= CURRENT_TIMESTAMP"),
+    env.AUTH_DB.prepare("INSERT INTO login_codes (code_hash, user_id, application_code, expires_at) VALUES (?, ?, ?, ?)")
+      .bind(await sha256Text(code), user.id, application.code, expiresAt),
+  ]);
+  destination.pathname = "/api/auth/portal";
+  destination.search = new URLSearchParams({ code }).toString();
+  destination.hash = "";
+  return redirect(destination.toString(), { "cache-control": "no-store", "referrer-policy": "no-referrer" });
 }
 
 export async function loginWithPassword(request, env, renderLogin) {
