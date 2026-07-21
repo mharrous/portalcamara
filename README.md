@@ -87,6 +87,22 @@ Roles disponibles:
 - `admin`: usuario administrador.
 - `usuario`: usuario normal para consultar el portal.
 
+## Autoridad central y Microsoft Entra
+
+El portal usa la D1 `portal-camara-auth` para usuarios, aplicaciones, permisos, sesiones y estados OAuth. La administración está disponible en `/admin/users` para usuarios con rol administrador.
+
+Microsoft Entra está implementado mediante Authorization Code Flow con PKCE, pero permanece desactivado por defecto. Consulta:
+
+- `SSO_ARCHITECTURE.md`
+- `MICROSOFT_ENTRA_SETUP.md`
+- `SSO_TEST_PLAN.md`
+
+Aplica el esquema inicial con:
+
+```powershell
+npx wrangler d1 execute portal-camara-auth --remote --file .\schema-auth.sql
+```
+
 ## Seguridad
 
 No subas secretos, tokens, contraseñas ni claves privadas al repositorio.

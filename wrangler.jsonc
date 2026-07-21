@@ -2,5 +2,20 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "portal",
   "main": "worker.js",
-  "compatibility_date": "2026-07-16"
+  "compatibility_date": "2026-07-21",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "ENTRA_ENABLED": "false",
+    "ENTRA_REDIRECT_URI": "https://portal.camaraceuta.workers.dev/api/auth/microsoft/callback",
+    "LOCAL_LOGIN_ENABLED": "true"
+  },
+  "d1_databases": [
+    {
+      "binding": "AUTH_DB",
+      "database_name": "portal-camara-auth",
+      "database_id": "9f4fbb08-6e87-4ca9-9e5f-49aa012ae3ed"
+    }
+  ]
 }

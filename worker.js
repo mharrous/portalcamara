@@ -1,17 +1,30 @@
+import {
+  allowedApplicationCodes,
+  authConfigurationError,
+  getSessionUser as getDatabaseSessionUser,
+  handleAuthRoute,
+  loginOptions,
+  loginWithPassword,
+  logoutResponse,
+} from "./auth.js";
+
 const PROYECTOS = [
   {
+    codigo: "calendario-eventos",
     nombre: "Calendario de Eventos",
     categoria: "Eventos",
     url: "https://calendario.camaradeceuta.workers.dev/",
     estado: "activo",
   },
   {
+    codigo: "reuniones",
     nombre: "Portal de Reuniones",
     categoria: "Interno",
     url: "https://reuniones.camaraceuta.workers.dev/",
     estado: "activo",
   },
   {
+    codigo: "innovacion",
     nombre: "Portal innovación",
     categoria: "Innovación",
     url: "#innovacion",
@@ -27,12 +40,14 @@ const PROYECTOS = [
 
 const INNOVACION = [
   {
+    codigo: "portal-proyectos-innovacion",
     nombre: "Portal de proyectos innovación",
     categoria: "Proyectos",
     url: "https://portalproyectoscamara.camaraceuta.workers.dev/",
     estado: "activo",
   },
   {
+    codigo: "gestion-jornadas",
     nombre: "Portal jornadas",
     categoria: "Jornadas",
     url: "https://portal-jornadas.pages.dev/",
@@ -48,7 +63,7 @@ const LOGIN_PATH = "/login";
 const LOGOUT_PATH = "/logout";
 
 
-﻿export default {
+export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
@@ -56,36 +71,50 @@ const LOGOUT_PATH = "/logout";
       return textResponse("ok");
     }
 
-    const configError = getAuthConfigError(env);
+    const configError = authConfigurationError(env);
     if (configError) {
       return htmlResponse(renderSetupRequired(configError), { status: 503 });
     }
 
+    const authRoute = await handleAuthRoute(request, env, {
+      html: htmlResponse,
+      forbidden: renderForbidden,
+    });
+    if (authRoute) return authRoute;
+
     if (url.pathname === LOGIN_PATH) {
       if (request.method === "GET") {
-        const sessionUser = await getSessionUser(request, env);
+        const sessionUser = await getDatabaseSessionUser(request, env);
         if (sessionUser) return redirectResponse("/");
-        return htmlResponse(renderLogin({ next: url.searchParams.get("next") || "/" }));
+        return htmlResponse(renderLogin({ next: url.searchParams.get("next") || "/", ...loginOptions(env) }));
       }
 
       if (request.method === "POST") {
-        return handleLogin(request, env);
+        return loginWithPassword(request, env, (state, status = 200) =>
+          htmlResponse(renderLogin({ ...state, ...loginOptions(env) }), { status })
+        );
       }
 
       return textResponse("Método no permitido", { status: 405 });
     }
 
     if (url.pathname === LOGOUT_PATH) {
-      return redirectResponse(LOGIN_PATH, { "set-cookie": clearSessionCookie() });
+      return logoutResponse(request, env, LOGIN_PATH);
     }
 
-    const sessionUser = await getSessionUser(request, env);
+    const sessionUser = await getDatabaseSessionUser(request, env);
     if (!sessionUser) {
       const next = encodeURIComponent(url.pathname + url.search);
       return redirectResponse(`${LOGIN_PATH}?next=${next}`);
     }
 
-    return htmlResponse(renderHtml(sessionUser));
+    const allowedCodes = await allowedApplicationCodes(sessionUser, env);
+    const innovationProjects = INNOVACION.filter((project) => allowedCodes.has(project.codigo));
+    const projects = PROYECTOS.filter((project) => {
+      if (project.codigo === "innovacion") return innovationProjects.length > 0;
+      return allowedCodes.has(project.codigo);
+    });
+    return htmlResponse(renderHtml(sessionUser, projects, innovationProjects));
   },
 };
 
@@ -339,7 +368,7 @@ function renderSetupRequired(message) {
   });
 }
 
-function renderLogin({ error = "", username = "", next = "/" } = {}) {
+function renderLogin({ error = "", username = "", next = "/", microsoftEnabled = false, localEnabled = true, microsoftStartPath = "" } = {}) {
   return renderAuthShell({
     title: "Acceso al portal",
     body: `
@@ -347,20 +376,31 @@ function renderLogin({ error = "", username = "", next = "/" } = {}) {
         <img class="login-logo" src="${LOGO_CAMARA}" alt="Cámara de Ceuta">
         <p class="login-kicker">Cámara de Ceuta</p>
         <h1>Acceso al portal</h1>
-        <p class="login-copy">Introduce tu usuario para acceder al portal de tarjetas.</p>
+        <p class="login-copy">Accede al portal de tarjetas con tu identidad corporativa.</p>
         ${error ? `<div class="login-error" role="alert">${escapeHtml(error)}</div>` : ""}
-        <input type="hidden" name="next" value="${escapeHtml(sanitizeNextPath(next))}">
-        <label>
-          <span>Usuario</span>
-          <input name="username" type="text" value="${escapeHtml(username)}" autocomplete="username" required autofocus>
-        </label>
-        <label>
-          <span>Contraseña</span>
-          <input name="password" type="password" autocomplete="current-password" required>
-        </label>
-        <button type="submit">Entrar</button>
+        ${microsoftEnabled ? `<a class="microsoft-button" href="${microsoftStartPath}?next=${encodeURIComponent(sanitizeNextPath(next))}">Entrar con Microsoft</a>` : `<p class="login-help">Microsoft Entra está preparado, pero permanece desactivado hasta completar la configuración.</p>`}
+        ${localEnabled ? `
+          <div class="login-separator"><span>Acceso local de emergencia</span></div>
+          <input type="hidden" name="next" value="${escapeHtml(sanitizeNextPath(next))}">
+          <label>
+            <span>Usuario</span>
+            <input name="username" type="text" value="${escapeHtml(username)}" autocomplete="username" required ${microsoftEnabled ? "" : "autofocus"}>
+          </label>
+          <label>
+            <span>Contraseña</span>
+            <input name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <button type="submit">Entrar localmente</button>
+        ` : ""}
       </form>
     `,
+  });
+}
+
+function renderForbidden(message = "No tienes permiso para acceder a este recurso.") {
+  return renderAuthShell({
+    title: "Acceso denegado",
+    body: `<div class="login-card"><img class="login-logo" src="${LOGO_CAMARA}" alt="Cámara de Ceuta"><p class="login-kicker">Seguridad</p><h1>Acceso denegado</h1><p class="login-copy">${escapeHtml(message)}</p><a class="microsoft-button" href="/">Volver al portal</a></div>`,
   });
 }
 
@@ -387,18 +427,21 @@ function renderAuthShell({ title, body }) {
     label { display: grid; gap: 8px; margin-bottom: 16px; color: var(--navy); font-weight: 800; }
     input { width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; font: 600 16px Inter, sans-serif; outline: none; background: #fff; }
     input:focus { border-color: var(--red); box-shadow: 0 0 0 4px rgba(225,29,47,.12); }
-    button { width: 100%; border: 0; border-radius: 999px; padding: 15px 20px; color: #fff; background: linear-gradient(135deg, var(--red), #f32d45); box-shadow: 0 18px 36px rgba(225,29,47,.24); font: 800 16px Inter, sans-serif; cursor: pointer; }
+    button, .microsoft-button { display: block; width: 100%; border: 0; border-radius: 999px; padding: 15px 20px; color: #fff; background: linear-gradient(135deg, var(--red), #f32d45); box-shadow: 0 18px 36px rgba(225,29,47,.24); font: 800 16px Inter, sans-serif; text-align: center; text-decoration: none; cursor: pointer; }
+    .login-separator { display: flex; align-items: center; gap: 10px; margin: 22px 0 16px; color: var(--soft); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+    .login-separator::before, .login-separator::after { content: ""; height: 1px; flex: 1; background: var(--border); }
   </style>
 </head>
 <body>${body}</body>
 </html>`;
 }
 
-function renderHtml(sessionUser) {
-  const proyectosJson = JSON.stringify(PROYECTOS, null, 2).replace(/</g, "\u003c");
-  const innovacionJson = JSON.stringify(INNOVACION, null, 2).replace(/</g, "\u003c");
-  const sessionLabel = escapeHtml(sessionUser?.username || "Usuario");
+function renderHtml(sessionUser, projects = [], innovationProjects = []) {
+  const proyectosJson = JSON.stringify(projects, null, 2).replace(/</g, "\u003c");
+  const innovacionJson = JSON.stringify(innovationProjects, null, 2).replace(/</g, "\u003c");
+  const sessionLabel = escapeHtml(sessionUser?.displayName || sessionUser?.username || "Usuario");
   const roleLabel = escapeHtml(sessionUser?.role === "admin" ? "Admin" : "Usuario");
+  const adminLink = sessionUser?.role === "admin" ? `<a href="/admin/users">Usuarios</a>` : "";
 
   return `<!doctype html>
 <html lang="es">
@@ -829,6 +872,7 @@ function renderHtml(sessionUser) {
         <div class="session-card" aria-label="Sesión iniciada">
           <span>${sessionLabel}</span>
           <strong>${roleLabel}</strong>
+          ${adminLink}
           <a href="${LOGOUT_PATH}">Salir</a>
         </div>
         <div class="stat">

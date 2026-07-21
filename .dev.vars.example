@@ -1,0 +1,5 @@
+AUTH_SECRET=replace-with-a-long-random-value
+AUTH_USERS=[]
+ENTRA_TENANT_ID=
+ENTRA_CLIENT_ID=
+ENTRA_CLIENT_SECRET=
