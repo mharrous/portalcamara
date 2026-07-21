@@ -101,6 +101,7 @@ Aplica el esquema inicial con:
 
 ```powershell
 npx wrangler d1 execute portal-camara-auth --remote --file .\schema-auth.sql
+npx wrangler d1 execute portal-camara-auth --remote --file .\migration-seed-legacy-users.sql
 ```
 
 ## Seguridad
