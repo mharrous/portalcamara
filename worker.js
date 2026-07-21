@@ -4,7 +4,6 @@ import {
   getSessionUser as getDatabaseSessionUser,
   handleAuthRoute,
   loginOptions,
-  loginWithPassword,
   logoutResponse,
 } from "./auth.js";
 
@@ -88,14 +87,8 @@ export default {
         if (sessionUser) return redirectResponse("/");
         return htmlResponse(renderLogin({
           next: url.searchParams.get("next") || "/",
-          ...loginOptions(env, url.searchParams.get("local") === "1"),
+          ...loginOptions(env),
         }));
-      }
-
-      if (request.method === "POST") {
-        return loginWithPassword(request, env, (state, status = 200) =>
-          htmlResponse(renderLogin({ ...state, ...loginOptions(env, true) }), { status })
-        );
       }
 
       return textResponse("Método no permitido", { status: 405 });
@@ -378,31 +371,18 @@ function renderSetupRequired(message) {
   });
 }
 
-function renderLogin({ error = "", username = "", next = "/", microsoftEnabled = false, localEnabled = true, microsoftStartPath = "" } = {}) {
+function renderLogin({ error = "", next = "/", microsoftEnabled = false, microsoftStartPath = "" } = {}) {
   return renderAuthShell({
     title: "Acceso al portal",
     body: `
-      <form class="login-card" method="post" action="${LOGIN_PATH}" autocomplete="on">
+      <div class="login-card">
         <img class="login-logo" src="${LOGO_CAMARA}" alt="Cámara de Ceuta">
         <p class="login-kicker">Cámara de Ceuta</p>
         <h1>Acceso al portal</h1>
         <p class="login-copy">Accede al portal de tarjetas con tu identidad corporativa.</p>
         ${error ? `<div class="login-error" role="alert">${escapeHtml(error)}</div>` : ""}
         ${microsoftEnabled ? `<a class="microsoft-button" href="${microsoftStartPath}?next=${encodeURIComponent(sanitizeNextPath(next))}">Entrar con Microsoft</a>` : `<p class="login-help">Microsoft Entra está preparado, pero permanece desactivado hasta completar la configuración.</p>`}
-        ${localEnabled ? `
-          <div class="login-separator"><span>Acceso local de emergencia</span></div>
-          <input type="hidden" name="next" value="${escapeHtml(sanitizeNextPath(next))}">
-          <label>
-            <span>Usuario</span>
-            <input name="username" type="text" value="${escapeHtml(username)}" autocomplete="username" required ${microsoftEnabled ? "" : "autofocus"}>
-          </label>
-          <label>
-            <span>Contraseña</span>
-            <input name="password" type="password" autocomplete="current-password" required>
-          </label>
-          <button type="submit">Entrar localmente</button>
-        ` : ""}
-      </form>
+      </div>
     `,
   });
 }

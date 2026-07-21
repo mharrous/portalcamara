@@ -9,8 +9,7 @@
   },
   "vars": {
     "ENTRA_ENABLED": "true",
-    "ENTRA_REDIRECT_URI": "https://portal.camaraceuta.workers.dev/api/auth/microsoft/callback",
-    "LOCAL_LOGIN_ENABLED": "false"
+    "ENTRA_REDIRECT_URI": "https://portal.camaraceuta.workers.dev/api/auth/microsoft/callback"
   },
   "d1_databases": [
     {

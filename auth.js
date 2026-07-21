@@ -7,20 +7,16 @@ const ADMIN_PATH = "/admin/users";
 
 export function authConfigurationError(env) {
   if (!env?.AUTH_DB) return "Falta enlazar la base de datos AUTH_DB.";
-  if (localLoginEnabled(env) && (!env.AUTH_SECRET || !env.AUTH_USERS)) {
-    return "Faltan AUTH_SECRET o AUTH_USERS para el acceso local de emergencia.";
-  }
   if (entraEnabled(env) && (!env.ENTRA_TENANT_ID || !env.ENTRA_CLIENT_ID || !env.ENTRA_CLIENT_SECRET || !env.ENTRA_REDIRECT_URI)) {
     return "Falta completar la configuración de Microsoft Entra.";
   }
   return "";
 }
 
-export function loginOptions(env, showLocal = false) {
+export function loginOptions(env) {
   const microsoftEnabled = entraEnabled(env);
   return {
     microsoftEnabled,
-    localEnabled: localLoginEnabled(env) && (showLocal || !microsoftEnabled),
     microsoftStartPath: MICROSOFT_START_PATH,
   };
 }
@@ -92,24 +88,6 @@ async function launchApplication(request, env, applicationCode) {
   return redirect(destination.toString(), { "cache-control": "no-store", "referrer-policy": "no-referrer" });
 }
 
-export async function loginWithPassword(request, env, renderLogin) {
-  if (!localLoginEnabled(env)) return renderLogin({ error: "El acceso local está desactivado." }, 403);
-  const form = await request.formData();
-  const username = String(form.get("username") || "").trim();
-  const password = String(form.get("password") || "");
-  const next = sanitizeNextPath(String(form.get("next") || "/"));
-  const legacyUser = await validateLegacyCredentials(username, password, env);
-
-  if (!legacyUser) {
-    return renderLogin({ error: "Usuario o contraseña incorrectos.", username, next }, 401);
-  }
-
-  const user = await ensureLegacyUser(legacyUser, env);
-  if (!user?.active) return renderLogin({ error: "Este usuario está desactivado.", username, next }, 403);
-  const cookie = await createDatabaseSession(user.id, "local", env);
-  return redirect(next, { "set-cookie": cookie });
-}
-
 export async function logoutResponse(request, env, destination = "/login") {
   const token = readCookie(request, SESSION_COOKIE);
   if (token) await env.AUTH_DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Text(token)).run();
@@ -129,7 +107,7 @@ export async function getSessionUser(request, env) {
   `).bind(tokenHash).first();
 
   if (row) {
-    if (!Number(row.active)) {
+    if (!Number(row.active) || row.provider !== "microsoft") {
       await env.AUTH_DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(tokenHash).run();
       return null;
     }
@@ -137,11 +115,7 @@ export async function getSessionUser(request, env) {
     return normalizeUser(row);
   }
 
-  if (!env.AUTH_SECRET) return null;
-  const legacy = await verifyLegacySessionToken(token, env.AUTH_SECRET);
-  if (!legacy) return null;
-  const user = await ensureLegacyUser(legacy, env);
-  return user?.active ? user : null;
+  return null;
 }
 
 export async function allowedApplicationCodes(user, env) {
@@ -280,31 +254,6 @@ async function findAndLinkMicrosoftUser(claims, env) {
   return row ? normalizeUser(row) : null;
 }
 
-async function ensureLegacyUser(legacyUser, env) {
-  const role = legacyUser.role === "admin" ? "admin" : "user";
-  let row = await env.AUTH_DB.prepare("SELECT * FROM users WHERE lower(legacy_username) = lower(?)").bind(legacyUser.username).first();
-  if (!row) {
-    const inserted = await env.AUTH_DB.prepare(`
-      INSERT INTO users (legacy_username, display_name, role, active, auth_provider, last_login_at)
-      VALUES (?, ?, ?, 1, 'local', CURRENT_TIMESTAMP)
-      RETURNING *
-    `).bind(legacyUser.username, legacyUser.username, role).first();
-    row = inserted;
-    const applications = await env.AUTH_DB.prepare("SELECT code FROM applications WHERE active = 1").all();
-    if (role !== "admin") {
-      for (const application of applications.results || []) {
-        await env.AUTH_DB.prepare(`
-          INSERT OR IGNORE INTO user_application_permissions (user_id, application_code, role, active)
-          VALUES (?, ?, 'user', 1)
-        `).bind(row.id, application.code).run();
-      }
-    }
-  } else {
-    await env.AUTH_DB.prepare("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?").bind(row.id).run();
-  }
-  return normalizeUser(row);
-}
-
 async function createDatabaseSession(userId, provider, env) {
   const token = randomToken(48);
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString();
@@ -313,18 +262,6 @@ async function createDatabaseSession(userId, provider, env) {
     env.AUTH_DB.prepare("INSERT INTO sessions (token_hash, user_id, provider, expires_at) VALUES (?, ?, ?, ?)").bind(await sha256Text(token), userId, provider, expiresAt),
   ]);
   return `${SESSION_COOKIE}=${token}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; HttpOnly; Secure; SameSite=Lax`;
-}
-
-async function validateLegacyCredentials(username, password, env) {
-  let users;
-  try {
-    users = JSON.parse(env.AUTH_USERS || "[]");
-  } catch {
-    return null;
-  }
-  const user = users.find((item) => String(item.username || "").toLowerCase() === username.toLowerCase());
-  if (!user?.passwordHash || !user?.role) return null;
-  return (await verifyPassword(password, user.passwordHash)) ? { username: user.username, role: user.role } : null;
 }
 
 async function withAdmin(request, env, operation) {
@@ -446,10 +383,6 @@ function entraEnabled(env) {
   return String(env?.ENTRA_ENABLED || "false").toLowerCase() === "true";
 }
 
-function localLoginEnabled(env) {
-  return String(env?.LOCAL_LOGIN_ENABLED ?? "true").toLowerCase() !== "false";
-}
-
 function sanitizeNextPath(value) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
   return value;
@@ -489,46 +422,6 @@ function base64UrlDecode(value) {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const binary = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
-
-async function verifyPassword(password, passwordHash) {
-  const parts = String(passwordHash).split("$");
-  if (parts[0] === "sha256" && parts.length === 3) {
-    const salt = base64UrlDecode(parts[1]);
-    const expected = base64UrlDecode(parts[2]);
-    const passwordBytes = new TextEncoder().encode(password);
-    const payload = new Uint8Array(salt.length + passwordBytes.length);
-    payload.set(salt); payload.set(passwordBytes, salt.length);
-    return constantTimeEqual(new Uint8Array(await crypto.subtle.digest("SHA-256", payload)), expected);
-  }
-  if (parts[0] !== "pbkdf2" || parts.length !== 4) return false;
-  const iterations = Number(parts[1]);
-  if (!Number.isInteger(iterations) || iterations < 100000) return false;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const derived = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: base64UrlDecode(parts[2]), iterations }, key, base64UrlDecode(parts[3]).length * 8);
-  return constantTimeEqual(new Uint8Array(derived), base64UrlDecode(parts[3]));
-}
-
-async function verifyLegacySessionToken(token, secret) {
-  const parts = token.split(".");
-  if (parts.length !== 2) return null;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const expected = base64Url(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(parts[0])));
-  if (!constantTimeEqual(new TextEncoder().encode(parts[1]), new TextEncoder().encode(expected))) return null;
-  try {
-    const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(parts[0])));
-    if (!payload.username || !payload.exp || payload.exp <= Math.floor(Date.now() / 1000)) return null;
-    return { username: String(payload.username), role: payload.role === "admin" ? "admin" : "user" };
-  } catch {
-    return null;
-  }
-}
-
-function constantTimeEqual(first, second) {
-  if (first.length !== second.length) return false;
-  let difference = 0;
-  for (let index = 0; index < first.length; index += 1) difference |= first[index] ^ second[index];
-  return difference === 0;
 }
 
 function redirect(location, headers = {}) {
