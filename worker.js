@@ -406,15 +406,15 @@ function renderAuthShell({ title, body }) {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    :root { --navy: #0c2944; --blue: #327fa5; --red: #dd1931; --gold: #ffd400; --text: #f8fbff; --soft: rgba(241,248,255,.78); }
+    :root { --navy: #17263d; --blue: #3f5878; --copper: #c65d32; --red: #dd1931; --gold: #ffd400; --text: #fffaf7; --soft: rgba(255,247,242,.8); }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; overflow-x: hidden; font-family: Inter, system-ui, sans-serif; color: var(--text); background: linear-gradient(118deg, #143550 0%, #246b91 48%, #5796b6 78%, #ecd0bd 125%); }
-    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.08), transparent 32%), linear-gradient(180deg, rgba(5,25,43,.15), transparent 38%); }
+    body { margin: 0; min-height: 100vh; overflow-x: hidden; font-family: Inter, system-ui, sans-serif; color: var(--text); background: linear-gradient(128deg, #263955 0%, #3d506d 31%, #5f4c50 53%, #9f4328 76%, #ef9a69 118%); background-attachment: fixed; }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 43%, rgba(255,255,255,.09), transparent 31%), linear-gradient(180deg, rgba(10,24,43,.18), transparent 40%, rgba(103,39,22,.08)); }
     .auth-shell { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 34px 40px 36px; }
     .auth-brand { display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,.94); font: 600 11px/1 "JetBrains Mono", monospace; letter-spacing: .3em; text-transform: uppercase; }
     .auth-brand::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 18px rgba(255,255,255,.45); }
     .auth-main { display: grid; place-items: center; padding: 48px 0; }
-    .login-card { width: min(460px, 100%); padding: 42px 40px 38px; text-align: center; border: 1px solid rgba(255,255,255,.34); border-radius: 24px; background: linear-gradient(150deg, rgba(255,255,255,.18), rgba(183,225,246,.12)); box-shadow: 0 28px 90px rgba(4,30,50,.22); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+    .login-card { width: min(460px, 100%); padding: 42px 40px 38px; text-align: center; border: 1px solid rgba(255,255,255,.38); border-radius: 24px; background: linear-gradient(145deg, rgba(149,174,204,.26), rgba(205,107,66,.25)); box-shadow: 0 28px 90px rgba(35,22,30,.24); backdrop-filter: blur(25px) saturate(115%); -webkit-backdrop-filter: blur(25px) saturate(115%); }
     .login-logo { width: 190px; max-height: 80px; object-fit: contain; display: block; margin: 0 auto 30px; }
     .login-kicker { margin: 0 0 16px; color: rgba(244,250,255,.72); font: 600 10px/1 "JetBrains Mono", monospace; letter-spacing: .38em; text-transform: uppercase; }
     h1 { margin: 0 0 12px; font: 700 31px/1.08 "Space Grotesk", Inter, sans-serif; letter-spacing: -.025em; color: #fff; }
@@ -423,7 +423,7 @@ function renderAuthShell({ title, body }) {
     label { display: grid; gap: 8px; margin-bottom: 16px; color: #fff; font-weight: 800; text-align: left; }
     input { width: 100%; border: 1px solid rgba(255,255,255,.28); border-radius: 14px; padding: 14px 16px; color: #fff; font: 600 16px Inter, sans-serif; outline: none; background: rgba(255,255,255,.12); }
     input:focus { border-color: rgba(255,255,255,.68); box-shadow: 0 0 0 4px rgba(255,255,255,.1); }
-    button, .microsoft-button { display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: center; gap: 13px; border: 1px solid rgba(255,255,255,.7); border-radius: 12px; padding: 14px 20px; color: var(--navy); background: rgba(255,255,255,.97); box-shadow: 0 12px 28px rgba(7,36,57,.18); font: 800 16px Inter, sans-serif; text-align: center; text-decoration: none; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
+    button, .microsoft-button { display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: center; gap: 13px; border: 1px solid rgba(255,255,255,.72); border-radius: 12px; padding: 14px 20px; color: var(--navy); background: rgba(255,255,255,.97); box-shadow: 0 12px 28px rgba(39,28,36,.19); font: 800 16px Inter, sans-serif; text-align: center; text-decoration: none; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
     button:hover, .microsoft-button:hover { transform: translateY(-2px); background: #fff; box-shadow: 0 18px 34px rgba(7,36,57,.25); }
     .microsoft-button img { width: 18px; height: 18px; }
     .login-trust { margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.22); color: rgba(241,248,255,.6); font-size: 11px; }
@@ -1143,6 +1143,82 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       .session-card { grid-template-columns: 1fr; gap: 9px; }
       .session-links { justify-content: flex-end; padding-top: 8px; padding-left: 0; border-top: 1px solid rgba(255,255,255,.18); border-left: 0; }
     }
+
+    /* Glass Copper Ceuta */
+    :root {
+      --bg: #283b58;
+      --surface: rgba(255,255,255,.14);
+      --border: rgba(255,255,255,.26);
+      --text: #fffaf7;
+      --text-soft: rgba(255,247,242,.77);
+      --text-faint: rgba(255,242,235,.57);
+      --navy: #192941;
+      --red: #ef2440;
+      --red-dark: #c21731;
+      --gold: #ffd400;
+      --soon: rgba(255,255,255,.16);
+    }
+
+    html,
+    body {
+      background: linear-gradient(128deg, #263955 0%, #3e506c 31%, #604c50 53%, #9f4328 76%, #ef9b6b 118%);
+      background-attachment: fixed;
+    }
+
+    body::before {
+      background: radial-gradient(circle at 48% 26%, rgba(255,255,255,.09), transparent 34%), linear-gradient(180deg, rgba(11,24,43,.18), transparent 44%, rgba(112,41,21,.08));
+    }
+
+    .glow-a { background: radial-gradient(circle, #7893b6, transparent 70%); }
+    .glow-b { background: radial-gradient(circle, #ff9b63, transparent 70%); }
+
+    .topbar {
+      border-color: rgba(255,255,255,.28);
+      background: linear-gradient(145deg, rgba(148,174,205,.2), rgba(198,95,54,.15));
+      box-shadow: 0 22px 60px rgba(35,22,30,.18);
+      backdrop-filter: blur(23px) saturate(112%);
+      -webkit-backdrop-filter: blur(23px) saturate(112%);
+    }
+
+    .session-card,
+    .stat,
+    .controls {
+      border-color: rgba(255,255,255,.27);
+      background: linear-gradient(145deg, rgba(157,180,208,.17), rgba(197,96,57,.12));
+      box-shadow: 0 16px 38px rgba(35,22,30,.12);
+    }
+
+    .session-avatar,
+    .card-icon {
+      background: linear-gradient(145deg, #263d5d, #df3f36 58%, #d97643);
+    }
+
+    .field-search,
+    .field-select,
+    .back-button {
+      border-color: rgba(255,255,255,.48);
+      background: rgba(255,250,247,.93);
+      box-shadow: 0 12px 30px rgba(46,28,34,.12);
+    }
+
+    .card {
+      border-color: rgba(255,255,255,.29);
+      background: linear-gradient(148deg, rgba(155,181,211,.2), rgba(202,101,61,.17));
+      box-shadow: 0 20px 50px rgba(36,23,31,.16);
+      backdrop-filter: blur(22px) saturate(112%);
+      -webkit-backdrop-filter: blur(22px) saturate(112%);
+    }
+
+    .card-live:hover,
+    .card-live:focus-visible {
+      border-color: rgba(255,255,255,.58);
+      box-shadow: 0 26px 58px rgba(59,29,31,.24);
+    }
+
+    .card-tag,
+    .session-role { background: rgba(255,255,255,.13); }
+    .card-status { color: #ffd5d3; }
+    .footbar { color: rgba(255,244,238,.67); }
   </style>
 </head>
 <body>
