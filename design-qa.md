@@ -32,7 +32,7 @@ final result: passed
 
 - El acceso y la pantalla de tarjetas comparten ocho temas de color sobre el mismo degradado y efecto cristal.
 - La eleccion se conserva al recargar mediante almacenamiento local del navegador.
-- En la pantalla de tarjetas, el boton queda flotante arriba a la izquierda y fuera del bloque de usuario.
+- En la pantalla de tarjetas, el boton queda flotante arriba a la derecha y fuera del bloque de usuario.
 - La paleta queda limitada al portal central; no modifica Jornadas, Reuniones ni las demas aplicaciones enlazadas.
 - Se comprobo en produccion la apertura de la paleta, el cambio de color y la ausencia de errores de consola.
 
