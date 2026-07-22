@@ -324,6 +324,75 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+const PORTAL_THEMES = [
+  { id: "copper", name: "Cobre", colors: ["#263955", "#604c50", "#ef9b6b"] },
+  { id: "ocean", name: "Océano", colors: ["#102a43", "#2e88a8", "#d8c9bb"] },
+  { id: "ceuta", name: "Ceuta", colors: ["#4e0e1b", "#c85b32", "#ffe2a7"] },
+  { id: "forest", name: "Bosque", colors: ["#17372f", "#4f8067", "#d9be7b"] },
+  { id: "violet", name: "Violeta", colors: ["#252044", "#755b89", "#efa487"] },
+  { id: "night", name: "Noche", colors: ["#0e1728", "#334c6f", "#99a8bd"] },
+  { id: "teal", name: "Turquesa", colors: ["#0d3840", "#2f8c85", "#d4d1aa"] },
+  { id: "plum", name: "Ciruela", colors: ["#301a34", "#864455", "#e5a979"] },
+];
+
+function themePickerMarkup(placement) {
+  const options = PORTAL_THEMES.map((theme) => `
+    <button class="theme-option" type="button" data-theme-value="${theme.id}" aria-label="Tema ${theme.name}" aria-pressed="false">
+      <span class="theme-preview" style="--preview-a:${theme.colors[0]};--preview-b:${theme.colors[1]};--preview-c:${theme.colors[2]}"></span>
+      <span>${theme.name}</span>
+    </button>
+  `).join("");
+  return `<div class="theme-picker theme-picker-${placement}">
+    <button class="theme-trigger" type="button" aria-expanded="false"><span class="theme-trigger-dot"></span><span>Temas</span></button>
+    <div class="theme-panel" hidden><div class="theme-panel-head"><strong>Elige un tema</strong><span>Sólo cambia el color</span></div><div class="theme-grid">${options}</div></div>
+  </div>`;
+}
+
+function themeStyles() {
+  return `
+    :root { --theme-1:#263955;--theme-2:#3e506c;--theme-3:#604c50;--theme-4:#9f4328;--theme-5:#ef9b6b;--theme-glow-a:#7893b6;--theme-glow-b:#ff9b63; }
+    :root[data-theme="ocean"] { --theme-1:#102a43;--theme-2:#1d5f82;--theme-3:#2e88a8;--theme-4:#6cb7c9;--theme-5:#d8c9bb;--theme-glow-a:#4fb5d2;--theme-glow-b:#e4c9b8; }
+    :root[data-theme="ceuta"] { --theme-1:#4e0e1b;--theme-2:#8c1628;--theme-3:#c85b32;--theme-4:#f1b544;--theme-5:#ffe2a7;--theme-glow-a:#d01c38;--theme-glow-b:#ffd45f; }
+    :root[data-theme="forest"] { --theme-1:#17372f;--theme-2:#276250;--theme-3:#4f8067;--theme-4:#8e9b64;--theme-5:#d9be7b;--theme-glow-a:#57a286;--theme-glow-b:#d4b96f; }
+    :root[data-theme="violet"] { --theme-1:#252044;--theme-2:#4b3f72;--theme-3:#755b89;--theme-4:#ad6f8e;--theme-5:#efa487;--theme-glow-a:#8070ba;--theme-glow-b:#ef9d82; }
+    :root[data-theme="night"] { --theme-1:#0e1728;--theme-2:#1d2d48;--theme-3:#334c6f;--theme-4:#536d8e;--theme-5:#99a8bd;--theme-glow-a:#536f9b;--theme-glow-b:#a7b4c7; }
+    :root[data-theme="teal"] { --theme-1:#0d3840;--theme-2:#14666c;--theme-3:#2f8c85;--theme-4:#71b9a3;--theme-5:#d4d1aa;--theme-glow-a:#48aaa5;--theme-glow-b:#d4c98e; }
+    :root[data-theme="plum"] { --theme-1:#301a34;--theme-2:#5c294f;--theme-3:#864455;--theme-4:#bd685a;--theme-5:#e5a979;--theme-glow-a:#955474;--theme-glow-b:#e4a16f; }
+    .theme-picker { z-index:1000; color:#fff; font-family:Inter,system-ui,sans-serif; }
+    .theme-picker-auth { position:fixed; top:28px; right:32px; }
+    .theme-picker-portal { position:fixed; top:28px; left:32px; }
+    .theme-picker-portal .theme-panel { left:0; right:auto; }
+    .theme-trigger { display:inline-flex; align-items:center; justify-content:center; gap:9px; min-width:104px; min-height:48px; padding:10px 14px; border:1px solid rgba(255,255,255,.34); border-radius:16px; background:linear-gradient(145deg,rgba(255,255,255,.16),rgba(255,255,255,.08)); color:#fff; box-shadow:0 14px 34px rgba(18,20,34,.16); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); font:700 13px Inter,sans-serif; cursor:pointer; transition:transform .18s ease,border-color .18s ease,background .18s ease; }
+    .theme-trigger:hover,.theme-trigger:focus-visible,.theme-trigger[aria-expanded="true"] { transform:translateY(-1px); border-color:rgba(255,255,255,.72); background:rgba(255,255,255,.2); outline:none; }
+    .theme-trigger-dot { width:17px; height:17px; border-radius:6px; background:linear-gradient(135deg,var(--theme-2),var(--theme-4),var(--theme-5)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.3); }
+    .theme-panel { position:absolute; top:calc(100% + 10px); right:0; width:min(344px,calc(100vw - 28px)); padding:16px; border:1px solid rgba(255,255,255,.34); border-radius:20px; background:linear-gradient(145deg,color-mix(in srgb,var(--theme-2) 92%,#172033),color-mix(in srgb,var(--theme-4) 88%,#172033)); box-shadow:0 28px 70px rgba(14,18,30,.35); backdrop-filter:blur(28px) saturate(120%); -webkit-backdrop-filter:blur(28px) saturate(120%); }
+    .theme-panel[hidden] { display:none; }
+    .theme-panel-head { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .theme-panel-head strong { font-size:14px; }
+    .theme-panel-head span { color:rgba(255,255,255,.62); font-size:10px; }
+    .theme-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+    .theme-option { display:grid; grid-template-columns:40px minmax(0,1fr); align-items:center; gap:9px; width:100%; min-height:48px; padding:7px 9px; border:1px solid rgba(255,255,255,.16); border-radius:13px; background:rgba(255,255,255,.07); color:#fff; box-shadow:none; font:700 12px Inter,sans-serif; text-align:left; cursor:pointer; }
+    .theme-option:hover,.theme-option:focus-visible,.theme-option[aria-pressed="true"] { border-color:rgba(255,255,255,.68); background:rgba(255,255,255,.16); outline:none; transform:none; }
+    .theme-preview { display:block; width:40px; height:31px; border-radius:9px; background:linear-gradient(135deg,var(--preview-a),var(--preview-b) 56%,var(--preview-c)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.28); }
+    @media(max-width:760px){.theme-picker-auth{top:18px;right:18px}.theme-picker-portal{top:18px;left:18px}.theme-panel{position:fixed;top:78px;right:14px}.theme-picker-portal .theme-panel{left:14px;right:auto}.theme-grid{grid-template-columns:1fr 1fr}}
+  `;
+}
+
+function themeBootstrapScript() {
+  return `<script>
+    (function(){
+      const themeIds=${JSON.stringify(PORTAL_THEMES.map((theme) => theme.id))};
+      const storageKey="portal-theme";
+      function savedTheme(){try{const value=localStorage.getItem(storageKey);return themeIds.includes(value)?value:"copper";}catch(_){return "copper";}}
+      function applyTheme(value,persist){const theme=themeIds.includes(value)?value:"copper";document.documentElement.dataset.theme=theme;if(persist){try{localStorage.setItem(storageKey,theme);}catch(_){}}document.querySelectorAll("[data-theme-value]").forEach(function(button){button.setAttribute("aria-pressed",String(button.dataset.themeValue===theme));});}
+      applyTheme(savedTheme(),false);
+      document.querySelectorAll(".theme-picker").forEach(function(picker){const trigger=picker.querySelector(".theme-trigger");const panel=picker.querySelector(".theme-panel");trigger.addEventListener("click",function(){const open=panel.hidden;document.querySelectorAll(".theme-panel").forEach(function(item){item.hidden=true;});document.querySelectorAll(".theme-trigger").forEach(function(item){item.setAttribute("aria-expanded","false");});panel.hidden=!open;trigger.setAttribute("aria-expanded",String(open));});picker.querySelectorAll("[data-theme-value]").forEach(function(button){button.addEventListener("click",function(){applyTheme(button.dataset.themeValue,true);panel.hidden=true;trigger.setAttribute("aria-expanded","false");});});});
+      document.addEventListener("click",function(event){if(event.target.closest(".theme-picker"))return;document.querySelectorAll(".theme-panel").forEach(function(panel){panel.hidden=true;});document.querySelectorAll(".theme-trigger").forEach(function(trigger){trigger.setAttribute("aria-expanded","false");});});
+      document.addEventListener("keydown",function(event){if(event.key!=="Escape")return;document.querySelectorAll(".theme-panel").forEach(function(panel){panel.hidden=true;});document.querySelectorAll(".theme-trigger").forEach(function(trigger){trigger.setAttribute("aria-expanded","false");});});
+    })();
+  </script>`;
+}
+
 function renderSetupRequired(message) {
   return renderAuthShell({
     title: "Configurar acceso",
@@ -373,16 +442,17 @@ function renderAuthShell({ title, body }) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem("portal-theme")||"copper";}catch(_){document.documentElement.dataset.theme="copper";}</script>
   <style>
     :root { --navy: #17263d; --blue: #3f5878; --copper: #c65d32; --red: #dd1931; --gold: #ffd400; --text: #fffaf7; --soft: rgba(255,247,242,.8); }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; overflow-x: hidden; font-family: Inter, system-ui, sans-serif; color: var(--text); background: linear-gradient(128deg, #263955 0%, #3d506d 31%, #5f4c50 53%, #9f4328 76%, #ef9a69 118%); background-attachment: fixed; }
+    body { margin: 0; min-height: 100vh; overflow-x: hidden; font-family: Inter, system-ui, sans-serif; color: var(--text); background: linear-gradient(128deg, var(--theme-1) 0%, var(--theme-2) 31%, var(--theme-3) 53%, var(--theme-4) 76%, var(--theme-5) 118%); background-attachment: fixed; }
     body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 43%, rgba(255,255,255,.09), transparent 31%), linear-gradient(180deg, rgba(10,24,43,.18), transparent 40%, rgba(103,39,22,.08)); }
     .auth-shell { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 34px 40px 36px; }
     .auth-brand { display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,.94); font: 600 11px/1 "JetBrains Mono", monospace; letter-spacing: .3em; text-transform: uppercase; }
     .auth-brand::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 18px rgba(255,255,255,.45); }
     .auth-main { display: grid; place-items: center; padding: 48px 0; }
-    .login-card { width: min(460px, 100%); padding: 42px 40px 38px; text-align: center; border: 1px solid rgba(255,255,255,.38); border-radius: 24px; background: linear-gradient(145deg, rgba(149,174,204,.26), rgba(205,107,66,.25)); box-shadow: 0 28px 90px rgba(35,22,30,.24); backdrop-filter: blur(25px) saturate(115%); -webkit-backdrop-filter: blur(25px) saturate(115%); }
+    .login-card { width: min(460px, 100%); padding: 42px 40px 38px; text-align: center; border: 1px solid rgba(255,255,255,.38); border-radius: 24px; background: linear-gradient(145deg, color-mix(in srgb,var(--theme-2) 34%,transparent), color-mix(in srgb,var(--theme-4) 28%,transparent)); box-shadow: 0 28px 90px rgba(35,22,30,.24); backdrop-filter: blur(25px) saturate(115%); -webkit-backdrop-filter: blur(25px) saturate(115%); }
     .login-logo { width: min(100%, 285px); height: auto; max-height: 96px; object-fit: contain; display: block; margin: 0 auto 28px; }
     .login-kicker { margin: 0 0 16px; color: rgba(244,250,255,.72); font: 600 10px/1 "JetBrains Mono", monospace; letter-spacing: .38em; text-transform: uppercase; }
     h1 { margin: 0 0 12px; font: 700 31px/1.08 "Space Grotesk", Inter, sans-serif; letter-spacing: -.025em; color: #fff; }
@@ -400,9 +470,10 @@ function renderAuthShell({ title, body }) {
     .login-separator::before, .login-separator::after { content: ""; height: 1px; flex: 1; background: rgba(255,255,255,.2); }
     .auth-footer { display: flex; justify-content: space-between; gap: 20px; color: rgba(242,248,255,.72); font: 500 11px/1.3 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; }
     @media (max-width: 640px) { .auth-shell { padding: 24px 20px; } .auth-main { padding: 32px 0; } .login-card { padding: 34px 24px 30px; } .login-logo { width: min(100%, 235px); max-height: 82px; } .auth-footer { flex-direction: column; align-items: center; text-align: center; } h1 { font-size: 28px; } }
+    ${themeStyles()}
   </style>
 </head>
-<body><div class="auth-shell"><div class="auth-brand">Cámara Oficial · Ceuta</div><main class="auth-main">${body}</main><footer class="auth-footer"><span>Portal corporativo · V3.2</span><span>Seguridad Microsoft Entra ID</span></footer></div></body>
+<body>${themePickerMarkup("auth")}<div class="auth-shell"><div class="auth-brand">Cámara Oficial · Ceuta</div><main class="auth-main">${body}</main><footer class="auth-footer"><span>Portal corporativo · V3.2</span><span>Seguridad Microsoft Entra ID</span></footer></div>${themeBootstrapScript()}</body>
 </html>`;
 }
 
@@ -435,6 +506,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem("portal-theme")||"copper";}catch(_){document.documentElement.dataset.theme="copper";}</script>
   <style>
     :root {
       --bg: #f5f2ed;
@@ -497,10 +569,12 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       z-index: 1;
       width: min(1080px, calc(100% - 40px));
       margin: 0 auto;
-      padding: 48px 0 56px;
+      padding: 100px 0 56px;
     }
 
     .topbar {
+      position: relative;
+      z-index: 20;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1098,7 +1172,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
     .footbar { border-color: rgba(255,255,255,.2); color: rgba(244,249,253,.62); }
 
     @media (max-width: 760px) {
-      .page { width: min(100% - 28px, 1120px); padding-top: 20px; }
+      .page { width: min(100% - 28px, 1120px); padding-top: 88px; }
       .topbar { align-items: flex-start; padding: 15px; }
       .header-actions { width: 100%; flex-direction: column; }
       .session-card { min-width: 0; width: 100%; }
@@ -1131,7 +1205,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
 
     html,
     body {
-      background: linear-gradient(128deg, #263955 0%, #3e506c 31%, #604c50 53%, #9f4328 76%, #ef9b6b 118%);
+      background: linear-gradient(128deg, var(--theme-1) 0%, var(--theme-2) 31%, var(--theme-3) 53%, var(--theme-4) 76%, var(--theme-5) 118%);
       background-attachment: fixed;
     }
 
@@ -1139,12 +1213,12 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       background: radial-gradient(circle at 48% 26%, rgba(255,255,255,.09), transparent 34%), linear-gradient(180deg, rgba(11,24,43,.18), transparent 44%, rgba(112,41,21,.08));
     }
 
-    .glow-a { background: radial-gradient(circle, #7893b6, transparent 70%); }
-    .glow-b { background: radial-gradient(circle, #ff9b63, transparent 70%); }
+    .glow-a { background: radial-gradient(circle, var(--theme-glow-a), transparent 70%); }
+    .glow-b { background: radial-gradient(circle, var(--theme-glow-b), transparent 70%); }
 
     .topbar {
       border-color: rgba(255,255,255,.28);
-      background: linear-gradient(145deg, rgba(148,174,205,.2), rgba(198,95,54,.15));
+      background: linear-gradient(145deg, color-mix(in srgb,var(--theme-2) 28%,transparent), color-mix(in srgb,var(--theme-4) 19%,transparent));
       box-shadow: 0 22px 60px rgba(35,22,30,.18);
       backdrop-filter: blur(23px) saturate(112%);
       -webkit-backdrop-filter: blur(23px) saturate(112%);
@@ -1154,13 +1228,13 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
     .stat,
     .controls {
       border-color: rgba(255,255,255,.27);
-      background: linear-gradient(145deg, rgba(157,180,208,.17), rgba(197,96,57,.12));
+      background: linear-gradient(145deg, color-mix(in srgb,var(--theme-2) 25%,transparent), color-mix(in srgb,var(--theme-4) 16%,transparent));
       box-shadow: 0 16px 38px rgba(35,22,30,.12);
     }
 
     .session-avatar,
     .card-icon {
-      background: linear-gradient(145deg, #263d5d, #df3f36 58%, #d97643);
+      background: linear-gradient(145deg, var(--theme-1), var(--theme-4) 58%, var(--theme-5));
     }
 
     .field-search,
@@ -1173,7 +1247,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
 
     .card {
       border-color: rgba(255,255,255,.29);
-      background: linear-gradient(148deg, rgba(155,181,211,.2), rgba(202,101,61,.17));
+      background: linear-gradient(148deg, color-mix(in srgb,var(--theme-2) 29%,transparent), color-mix(in srgb,var(--theme-4) 22%,transparent));
       box-shadow: 0 20px 50px rgba(36,23,31,.16);
       backdrop-filter: blur(22px) saturate(112%);
       -webkit-backdrop-filter: blur(22px) saturate(112%);
@@ -1291,9 +1365,11 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       .card-editor-actions { flex-direction: column-reverse; }
       .dialog-primary, .dialog-secondary { width: 100%; }
     }
+    ${themeStyles()}
   </style>
 </head>
 <body>
+  ${themePickerMarkup("portal")}
   <div class="glow glow-a"></div>
   <div class="glow glow-b"></div>
 
@@ -1676,6 +1752,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       subtree: true,
     });
   </script>
+  ${themeBootstrapScript()}
 </body>
 </html>`;
 }
