@@ -1224,7 +1224,6 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       place-items: center;
       width: 34px;
       height: 34px;
-      margin-left: auto;
       border: 1px solid rgba(255,255,255,.38);
       border-radius: 11px;
       background: rgba(255,255,255,.14);
@@ -1234,6 +1233,9 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
 
     .card-edit-button:hover,
     .card-edit-button:focus-visible { background: rgba(255,255,255,.25); outline: none; }
+    .card-edit-actions { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+    .card-delete-button:hover,
+    .card-delete-button:focus-visible { border-color: rgba(255,205,205,.72); background: rgba(148,22,36,.42); }
     .card.editing .card-dot { display: none; }
 
     .add-card {
@@ -1464,13 +1466,23 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       top.className = "card-top";
       top.appendChild(createTextElement("span", "card-icon", initial(project.nombre)));
       if (editable) {
+        const editActions = document.createElement("div");
+        editActions.className = "card-edit-actions";
         const editButton = document.createElement("button");
         editButton.type = "button";
         editButton.className = "card-edit-button";
         editButton.setAttribute("aria-label", "Editar " + project.nombre);
         editButton.innerHTML = '<i class="bi bi-pencil-square" aria-hidden="true"></i>';
         editButton.addEventListener("click", function() { openCardEditor(project); });
-        top.appendChild(editButton);
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "card-edit-button card-delete-button";
+        deleteButton.setAttribute("aria-label", "Borrar " + project.nombre);
+        deleteButton.innerHTML = '<i class="bi bi-trash3" aria-hidden="true"></i>';
+        deleteButton.addEventListener("click", function() { deleteCard(project); });
+        editActions.appendChild(editButton);
+        editActions.appendChild(deleteButton);
+        top.appendChild(editActions);
       } else {
         top.appendChild(createTextElement("span", "card-dot", ""));
       }
@@ -1508,6 +1520,20 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       cardEditorError.textContent = "";
       cardEditorDialog.showModal();
       window.setTimeout(function() { cardEditorForm.elements.cardName.focus(); }, 0);
+    }
+
+    async function deleteCard(project) {
+      if (!project?.codigo) return;
+      const confirmed = window.confirm('¿Borrar definitivamente "' + project.nombre + '"? También se eliminarán sus permisos de acceso.');
+      if (!confirmed) return;
+      try {
+        const response = await fetch("/api/admin/applications/" + encodeURIComponent(project.codigo), { method: "DELETE" });
+        const result = await response.json().catch(function() { return {}; });
+        if (!response.ok) throw new Error(result.error || "No se pudo borrar la tarjeta.");
+        window.location.reload();
+      } catch (error) {
+        window.alert(error.message);
+      }
     }
 
     function createAddCard() {

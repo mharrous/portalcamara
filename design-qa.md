@@ -28,6 +28,15 @@
 
 final result: passed
 
+## Borrado de tarjetas
+
+- El modo edición muestra una papelera junto al lápiz de cada tarjeta real.
+- El borrado solicita confirmación e informa de que también elimina los permisos asociados.
+- La API de borrado está restringida a administradores y registra la acción en auditoría.
+- La tarjeta de prueba usada durante la verificación fue restaurada con su ruta y permisos originales.
+
+final result: passed
+
 ## Editor de tarjetas
 
 - El botón de edición sólo aparece para administradores.

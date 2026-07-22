@@ -87,6 +87,10 @@ export async function handleAuthRoute(request, env, renderers) {
   if (deleteUserMatch && request.method === "DELETE") {
     return withAdmin(request, env, (admin) => deleteUser(Number(deleteUserMatch[1]), env, admin));
   }
+  const deleteApplicationMatch = url.pathname.match(/^\/api\/admin\/applications\/([a-z0-9-]+)$/);
+  if (deleteApplicationMatch && request.method === "DELETE") {
+    return withAdmin(request, env, (admin) => deleteApplication(deleteApplicationMatch[1], env, admin));
+  }
   return null;
 }
 
@@ -560,6 +564,17 @@ async function saveApplication(request, env, admin) {
   return json({ ok: true, code }, 201);
 }
 
+async function deleteApplication(applicationCode, env, admin) {
+  if (!/^[a-z0-9-]+$/.test(applicationCode)) throw new Error("Código de tarjeta no válido.");
+  const target = await env.AUTH_DB.prepare("SELECT code, name FROM applications WHERE code = ?")
+    .bind(applicationCode)
+    .first();
+  if (!target) throw new Error("Tarjeta no encontrada.");
+  await env.AUTH_DB.prepare("DELETE FROM applications WHERE code = ?").bind(applicationCode).run();
+  await audit(env, admin.id, "application.delete", "application", applicationCode, { name: target.name });
+  return json({ ok: true });
+}
+
 async function savePermission(request, env, admin) {
   const payload = await request.json();
   const userId = Number(payload.userId || 0);
@@ -654,7 +669,7 @@ function renderSecurityAdminPage(user) {
     function date(value){if(!value)return '—';const normalized=String(value).includes('T')?value:String(value).replace(' ','T')+'Z';return new Date(normalized).toLocaleString('es-ES');}
     function permission(userId,code){return data.permissions.find(function(item){return Number(item.user_id)===Number(userId)&&item.application_code===code;});}
     function device(userAgent){const ua=String(userAgent||'');let browser='Navegador';let system='Dispositivo';if(/Edg\\//.test(ua))browser='Edge';else if(/Chrome\\//.test(ua))browser='Chrome';else if(/Firefox\\//.test(ua))browser='Firefox';else if(/Safari\\//.test(ua))browser='Safari';if(/Windows/.test(ua))system='Windows';else if(/Android/.test(ua))system='Android';else if(/iPhone|iPad/.test(ua))system='iPhone/iPad';else if(/Macintosh/.test(ua))system='Mac';return browser+' · '+system;}
-    function actionLabel(action){return ({'login.success':'Inicio correcto','login.denied':'Acceso rechazado','session.logout':'Cierre de sesión','session.revoke':'Sesión cerrada por admin','session.revoke_user':'Sesiones de usuario cerradas','session.revoke_others':'Otras sesiones cerradas','application.launch':'Aplicación abierta','application.denied':'Aplicación rechazada','application.create':'Tarjeta creada','application.update':'Tarjeta actualizada','permission.update':'Permiso actualizado','user.update':'Usuario actualizado','user.create':'Usuario creado','user.delete':'Usuario eliminado'})[action]||action;}
+    function actionLabel(action){return ({'login.success':'Inicio correcto','login.denied':'Acceso rechazado','session.logout':'Cierre de sesión','session.revoke':'Sesión cerrada por admin','session.revoke_user':'Sesiones de usuario cerradas','session.revoke_others':'Otras sesiones cerradas','application.launch':'Aplicación abierta','application.denied':'Aplicación rechazada','application.create':'Tarjeta creada','application.update':'Tarjeta actualizada','application.delete':'Tarjeta eliminada','application.restore':'Tarjeta restaurada','permission.update':'Permiso actualizado','user.update':'Usuario actualizado','user.create':'Usuario creado','user.delete':'Usuario eliminado'})[action]||action;}
     function detailText(event){let detail={};try{detail=JSON.parse(event.detail||'{}');}catch(_){}const parts=[];if(detail.reason)parts.push('Motivo: '+detail.reason);if(detail.email)parts.push(detail.email);if(detail.displayName)parts.push(detail.displayName);if(detail.userId)parts.push('Usuario #'+detail.userId);if(detail.count!==undefined)parts.push(detail.count+' sesiones');if(detail.active!==undefined)parts.push(detail.active?'Activado':'Desactivado');return parts.join(' · ')||'—';}
     function drawUsers(){const body=document.querySelector('#users');body.innerHTML='';data.users.forEach(function(user){const row=document.createElement('tr');row.innerHTML='<td><input data-field="displayName" value="'+esc(user.display_name)+'"><span class="muted">'+(user.entra_oid?'Microsoft vinculado':'Pendiente de primer acceso Microsoft')+'</span></td><td><input data-field="email" type="email" placeholder="nombre@empresa.es" value="'+esc(user.email||'')+'"></td><td><select data-field="role"><option value="user">Usuario</option><option value="admin">Administrador</option></select></td><td><select data-field="active"><option value="1">Activo</option><option value="0">Desactivado</option></select></td><td><div class="apps">'+data.applications.map(function(app){const current=permission(user.id,app.code);return '<label class="perm"><input type="checkbox" data-app="'+esc(app.code)+'" '+(current&&Number(current.active)?'checked':'')+'><span>'+esc(app.name)+'</span></label>';}).join('')+'</div></td><td><div class="actions"><button data-save>Guardar</button><button class="secondary compact" data-sessions>Cerrar sesiones</button><button class="danger compact" data-delete>Borrar</button></div></td>';row.querySelector('[data-field="role"]').value=user.role;row.querySelector('[data-field="active"]').value=String(Number(user.active));row.querySelector('[data-save]').onclick=function(){saveUser(row,user);};row.querySelector('[data-sessions]').onclick=function(){closeUserSessions(user);};row.querySelector('[data-delete]').onclick=function(){removeUser(user);};body.appendChild(row);});}
     function drawSessions(){const body=document.querySelector('#sessions');body.innerHTML='';if(!sessions.length){body.innerHTML='<tr><td colspan="6" class="muted">No hay sesiones activas.</td></tr>';return;}sessions.forEach(function(session){const row=document.createElement('tr');row.innerHTML='<td><strong>'+esc(session.display_name)+'</strong><br><span class="muted">'+esc(session.email||'')+'</span></td><td><span class="device">'+esc(device(session.user_agent))+'</span><br><span class="muted">Microsoft</span></td><td>'+date(session.created_at)+'</td><td>'+date(session.last_seen_at)+'</td><td>'+date(session.expires_at)+'</td><td>'+(session.current?'<span class="tag current">Esta sesión</span>':'<button class="danger compact" data-close>Cerrar</button>')+'</td>';const button=row.querySelector('[data-close]');if(button)button.onclick=function(){closeSession(session);};body.appendChild(row);});}
