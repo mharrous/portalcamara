@@ -28,6 +28,15 @@
 
 final result: passed
 
+## Logo del acceso
+
+- El login utiliza el logotipo horizontal facilitado por el usuario a 741 × 235 píxeles.
+- El recurso queda embebido en el Worker y separado del icono utilizado en el portal.
+- Se verificó una presentación de 285 × 90 píxeles, centrada y sin deformación.
+- La pantalla de acceso no presenta errores de consola.
+
+final result: passed
+
 ## Borrado de tarjetas
 
 - El modo edición muestra una papelera junto al lápiz de cada tarjeta real.
