@@ -69,8 +69,8 @@ async function launchApplication(request, env, applicationCode) {
     LEFT JOIN user_application_permissions p
       ON p.application_code = a.code AND p.user_id = ?
     WHERE a.code = ? AND a.active = 1
-      AND (? = 'admin' OR (p.active = 1))
-  `).bind(user.id, applicationCode, user.role).first();
+      AND p.active = 1
+  `).bind(user.id, applicationCode).first();
   if (!application) return new Response("Acceso denegado", { status: 403 });
 
   const destination = new URL(application.url);
@@ -119,10 +119,6 @@ export async function getSessionUser(request, env) {
 }
 
 export async function allowedApplicationCodes(user, env) {
-  if (user.role === "admin") {
-    const result = await env.AUTH_DB.prepare("SELECT code FROM applications WHERE active = 1 ORDER BY code").all();
-    return new Set((result.results || []).map((row) => row.code));
-  }
   const result = await env.AUTH_DB.prepare(`
     SELECT p.application_code AS code
     FROM user_application_permissions p
