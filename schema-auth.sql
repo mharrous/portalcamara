@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS applications (
   code TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   category TEXT NOT NULL,
+  label TEXT,
+  portal_section TEXT NOT NULL DEFAULT 'root' CHECK (portal_section IN ('root', 'innovacion')),
+  sort_order INTEGER NOT NULL DEFAULT 0,
   url TEXT NOT NULL,
   active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
   controlled INTEGER NOT NULL DEFAULT 0 CHECK (controlled IN (0, 1)),
@@ -104,3 +107,8 @@ ON CONFLICT(code) DO UPDATE SET
   controlled = excluded.controlled,
   integration_status = excluded.integration_status,
   updated_at = CURRENT_TIMESTAMP;
+
+UPDATE applications SET label = 'Eventos', portal_section = 'root', sort_order = 10 WHERE code = 'calendario-eventos' AND label IS NULL;
+UPDATE applications SET label = 'Interno', portal_section = 'root', sort_order = 20 WHERE code = 'reuniones' AND label IS NULL;
+UPDATE applications SET label = 'Proyectos', portal_section = 'innovacion', sort_order = 10 WHERE code = 'portal-proyectos-innovacion' AND label IS NULL;
+UPDATE applications SET label = 'Jornadas', portal_section = 'innovacion', sort_order = 20 WHERE code = 'gestion-jornadas' AND label IS NULL;

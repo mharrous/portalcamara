@@ -1,58 +1,11 @@
 import {
-  allowedApplicationCodes,
   authConfigurationError,
   getSessionUser as getDatabaseSessionUser,
   handleAuthRoute,
   loginOptions,
   logoutResponse,
+  portalApplications,
 } from "./auth.js";
-
-const PROYECTOS = [
-  {
-    codigo: "calendario-eventos",
-    nombre: "Calendario de Eventos",
-    categoria: "Eventos",
-    url: "https://calendario.camaradeceuta.workers.dev/",
-    estado: "activo",
-  },
-  {
-    codigo: "reuniones",
-    nombre: "Portal de Reuniones",
-    categoria: "Interno",
-    url: "https://reuniones.camaraceuta.workers.dev/",
-    estado: "activo",
-  },
-  {
-    codigo: "innovacion",
-    nombre: "Portal innovación",
-    categoria: "Innovación",
-    url: "#innovacion",
-    estado: "activo",
-  },
-  {
-    nombre: "Próximo proyecto",
-    categoria: "Por definir",
-    url: "",
-    estado: "proximamente",
-  },
-];
-
-const INNOVACION = [
-  {
-    codigo: "portal-proyectos-innovacion",
-    nombre: "Portal de proyectos innovación",
-    categoria: "Proyectos",
-    url: "https://portalproyectoscamara.camaraceuta.workers.dev/",
-    estado: "activo",
-  },
-  {
-    codigo: "gestion-jornadas",
-    nombre: "Portal jornadas",
-    categoria: "Jornadas",
-    url: "https://portal-jornadas.pages.dev/",
-    estado: "activo",
-  },
-];
 
 const LOGO_CAMARA = "data:image/png;base64,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";
 
@@ -104,19 +57,32 @@ export default {
       return redirectResponse(`${LOGIN_PATH}?next=${next}`);
     }
 
-    const allowedCodes = await allowedApplicationCodes(sessionUser, env);
-    const innovationProjects = INNOVACION
-      .filter((project) => allowedCodes.has(project.codigo))
-      .map((project) => ({
-        ...project,
-        url: `https://portal.camaraceuta.workers.dev/api/apps/${project.codigo}/launch`,
-      }));
-    const projects = PROYECTOS.filter((project) => {
-      if (project.codigo === "innovacion") return innovationProjects.length > 0;
-      return allowedCodes.has(project.codigo);
-    }).map((project) => project.codigo === "reuniones"
-      ? { ...project, url: "https://portal.camaraceuta.workers.dev/api/apps/reuniones/launch" }
-      : project);
+    const applicationRows = await portalApplications(sessionUser, env);
+    const cardForApplication = (application) => ({
+      codigo: application.code,
+      nombre: application.name,
+      categoria: application.label || application.category,
+      url: `https://portal.camaraceuta.workers.dev/api/apps/${application.code}/launch`,
+      sourceUrl: application.url,
+      estado: "activo",
+      editable: true,
+    });
+    const innovationProjects = applicationRows
+      .filter((application) => application.portal_section === "innovacion")
+      .map(cardForApplication);
+    const projects = applicationRows
+      .filter((application) => application.portal_section !== "innovacion")
+      .map(cardForApplication);
+    if (innovationProjects.length) {
+      projects.push({
+        codigo: "innovacion",
+        nombre: "Portal innovación",
+        categoria: "Innovación",
+        url: "#innovacion",
+        estado: "activo",
+        editable: false,
+      });
+    }
     return htmlResponse(renderHtml(sessionUser, projects, innovationProjects));
   },
 };
@@ -454,6 +420,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
   );
   const roleLabel = escapeHtml(sessionUser?.role === "admin" ? "Admin" : "Usuario");
   const adminLink = sessionUser?.role === "admin" ? `<a class="session-link" href="/admin/users">Usuarios</a>` : "";
+  const canEditCards = sessionUser?.role === "admin";
 
   return `<!doctype html>
 <html lang="es">
@@ -465,6 +432,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
     :root {
       --bg: #f5f2ed;
@@ -1219,6 +1187,106 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
     .session-role { background: rgba(255,255,255,.13); }
     .card-status { color: #ffd5d3; }
     .footbar { color: rgba(255,244,238,.67); }
+
+    .card-editor-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 92px;
+      padding: 0 16px;
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(157,180,208,.17), rgba(197,96,57,.12));
+      color: #fff;
+      font: 700 13px "Inter", sans-serif;
+      cursor: pointer;
+      box-shadow: 0 16px 38px rgba(35,22,30,.12);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      transition: border-color .18s ease, background .18s ease, transform .18s ease;
+    }
+
+    .card-editor-toggle:hover,
+    .card-editor-toggle:focus-visible,
+    .card-editor-toggle[aria-pressed="true"] {
+      border-color: rgba(255,255,255,.7);
+      background: rgba(255,255,255,.2);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    .card.editing { cursor: default; border-style: dashed; }
+    .card.editing:hover { transform: none; box-shadow: 0 20px 50px rgba(36,23,31,.16); }
+
+    .card-edit-button {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      margin-left: auto;
+      border: 1px solid rgba(255,255,255,.38);
+      border-radius: 11px;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .card-edit-button:hover,
+    .card-edit-button:focus-visible { background: rgba(255,255,255,.25); outline: none; }
+    .card.editing .card-dot { display: none; }
+
+    .add-card {
+      display: grid;
+      place-items: center;
+      min-height: 218px;
+      padding: 22px;
+      border: 1.5px dashed rgba(255,255,255,.52);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.055);
+      color: rgba(255,255,255,.86);
+      cursor: pointer;
+      animation: rise .35s ease forwards;
+      transition: background .18s ease, border-color .18s ease, transform .18s ease;
+    }
+
+    .add-card:hover,
+    .add-card:focus-visible { background: rgba(255,255,255,.12); border-color: #fff; transform: translateY(-2px); outline: none; }
+    .add-card-content { display: grid; justify-items: center; gap: 12px; font-weight: 700; }
+    .add-card-icon { display: grid; place-items: center; width: 46px; height: 46px; border: 1px solid rgba(255,255,255,.4); border-radius: 15px; font-size: 22px; background: rgba(255,255,255,.1); }
+
+    .card-editor-dialog {
+      width: min(560px, calc(100% - 28px));
+      padding: 0;
+      border: 1px solid rgba(255,255,255,.52);
+      border-radius: 24px;
+      background: linear-gradient(145deg, rgba(72,88,112,.98), rgba(137,74,57,.98));
+      color: #fff;
+      box-shadow: 0 34px 90px rgba(23,17,27,.42);
+    }
+
+    .card-editor-dialog::backdrop { background: rgba(19,27,41,.62); backdrop-filter: blur(7px); }
+    .card-editor-form { display: grid; gap: 18px; padding: 26px; }
+    .card-editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .card-editor-head h2 { margin: 2px 0 0; font: 700 25px "Space Grotesk", sans-serif; }
+    .card-editor-kicker { margin: 0; font: 700 10px "JetBrains Mono", monospace; letter-spacing: .17em; text-transform: uppercase; color: rgba(255,255,255,.64); }
+    .dialog-close { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid rgba(255,255,255,.28); border-radius: 12px; background: rgba(255,255,255,.09); color: #fff; cursor: pointer; }
+    .card-editor-field { display: grid; gap: 7px; font-size: 12px; font-weight: 700; }
+    .card-editor-field input { width: 100%; padding: 13px 14px; border: 1px solid rgba(255,255,255,.42); border-radius: 13px; background: rgba(255,255,255,.94); color: #192941; font: 500 15px "Inter", sans-serif; outline: none; }
+    .card-editor-field input:focus { border-color: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,.12); }
+    .card-editor-help { margin: 0; color: rgba(255,255,255,.7); font-size: 12px; line-height: 1.55; }
+    .card-editor-error { margin: 0; padding: 10px 12px; border-radius: 11px; background: rgba(111,19,33,.42); color: #fff; font-size: 13px; }
+    .card-editor-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+    .dialog-primary,
+    .dialog-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 16px; border-radius: 12px; font-weight: 800; cursor: pointer; }
+    .dialog-primary { border: 0; background: #fff; color: #192941; }
+    .dialog-secondary { border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; }
+
+    @media (max-width: 760px) {
+      .card-editor-toggle { min-height: 48px; }
+      .card-editor-actions { flex-direction: column-reverse; }
+      .dialog-primary, .dialog-secondary { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -1235,6 +1303,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
         </div>
       </div>
       <div class="header-actions">
+        ${canEditCards ? `<button class="card-editor-toggle" id="cardEditorToggle" type="button" aria-pressed="false" title="Editar tarjetas"><i class="bi bi-pencil" aria-hidden="true"></i><span>Editar</span></button>` : ""}
         <div class="session-card" aria-label="Sesión iniciada">
           <div class="session-identity">
             <span class="session-avatar" aria-hidden="true">${sessionInitials}</span>
@@ -1280,9 +1349,29 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
     </footer>
   </main>
 
+  ${canEditCards ? `<dialog class="card-editor-dialog" id="cardEditorDialog">
+    <form class="card-editor-form" id="cardEditorForm">
+      <div class="card-editor-head">
+        <div><p class="card-editor-kicker">Administración</p><h2 id="cardEditorTitle">Añadir tarjeta</h2></div>
+        <button class="dialog-close" id="cardEditorClose" type="button" aria-label="Cerrar"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+      </div>
+      <input id="cardCode" name="cardCode" type="hidden">
+      <label class="card-editor-field"><span>Nombre</span><input id="cardName" name="cardName" required maxlength="80" placeholder="Portal jornadas"></label>
+      <label class="card-editor-field"><span>Etiqueta</span><input id="cardLabel" name="cardLabel" required maxlength="40" placeholder="Jornadas"></label>
+      <label class="card-editor-field"><span>Ruta</span><input id="cardUrl" name="cardUrl" type="url" required placeholder="https://..."></label>
+      <p class="card-editor-help">La tarjeta se guardará en la sección que estás viendo. Después podrás asignarla a otros usuarios desde Administración.</p>
+      <p class="card-editor-error" id="cardEditorError" role="alert" hidden></p>
+      <div class="card-editor-actions">
+        <button class="dialog-secondary" id="cardEditorCancel" type="button">Cancelar</button>
+        <button class="dialog-primary" type="submit"><i class="bi bi-check2" aria-hidden="true"></i> Guardar tarjeta</button>
+      </div>
+    </form>
+  </dialog>` : ""}
+
   <script>
     const PROYECTOS = ${proyectosJson};
     const INNOVACION = ${innovacionJson};
+    const CAN_EDIT_CARDS = ${canEditCards ? "true" : "false"};
     const gridContainer = document.getElementById("projectGrid");
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
@@ -1291,6 +1380,12 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
     const todayLabel = document.getElementById("today");
     const portalTitle = document.getElementById("portalTitle");
     const backButton = document.getElementById("backButton");
+    const cardEditorToggle = document.getElementById("cardEditorToggle");
+    const cardEditorDialog = document.getElementById("cardEditorDialog");
+    const cardEditorForm = document.getElementById("cardEditorForm");
+    const cardEditorTitle = document.getElementById("cardEditorTitle");
+    const cardEditorError = document.getElementById("cardEditorError");
+    let editMode = false;
 
     function removeInstallPromptArtifacts() {
       document.querySelectorAll("body *").forEach(function(element) {
@@ -1343,9 +1438,10 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
 
     function createProjectCard(project, index) {
       const isLive = projectIsActive(project);
-      const card = document.createElement(isLive ? "a" : "article");
+      const editable = CAN_EDIT_CARDS && editMode && project.editable !== false;
+      const card = document.createElement(isLive && !editable ? "a" : "article");
 
-      if (isLive) {
+      if (isLive && !editable) {
         card.href = project.url;
 
         if (isInternalProject(project)) {
@@ -1361,13 +1457,23 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
         }
       }
 
-      card.className = "card " + (isLive ? "card-live" : "card-soon");
+      card.className = "card " + (isLive ? "card-live" : "card-soon") + (editable ? " editing" : "");
       card.style.animationDelay = String(index * 60) + "ms";
 
       const top = document.createElement("div");
       top.className = "card-top";
       top.appendChild(createTextElement("span", "card-icon", initial(project.nombre)));
-      top.appendChild(createTextElement("span", "card-dot", ""));
+      if (editable) {
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.className = "card-edit-button";
+        editButton.setAttribute("aria-label", "Editar " + project.nombre);
+        editButton.innerHTML = '<i class="bi bi-pencil-square" aria-hidden="true"></i>';
+        editButton.addEventListener("click", function() { openCardEditor(project); });
+        top.appendChild(editButton);
+      } else {
+        top.appendChild(createTextElement("span", "card-dot", ""));
+      }
 
       const body = document.createElement("div");
       body.className = "card-body";
@@ -1384,6 +1490,34 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       card.appendChild(body);
       card.appendChild(foot);
       return card;
+    }
+
+    function currentPortalSection() {
+      return isInnovationView() ? "innovacion" : "root";
+    }
+
+    function openCardEditor(project) {
+      if (!cardEditorDialog || !cardEditorForm) return;
+      const current = project || {};
+      cardEditorForm.elements.cardCode.value = current.codigo || "";
+      cardEditorForm.elements.cardName.value = current.nombre || "";
+      cardEditorForm.elements.cardLabel.value = current.categoria || "";
+      cardEditorForm.elements.cardUrl.value = current.sourceUrl || "";
+      cardEditorTitle.textContent = current.codigo ? "Editar tarjeta" : "Añadir tarjeta";
+      cardEditorError.hidden = true;
+      cardEditorError.textContent = "";
+      cardEditorDialog.showModal();
+      window.setTimeout(function() { cardEditorForm.elements.cardName.focus(); }, 0);
+    }
+
+    function createAddCard() {
+      const addCard = document.createElement("button");
+      addCard.type = "button";
+      addCard.className = "add-card";
+      addCard.setAttribute("aria-label", "Añadir una tarjeta");
+      addCard.innerHTML = '<span class="add-card-content"><span class="add-card-icon"><i class="bi bi-plus-lg" aria-hidden="true"></i></span><span>Añadir tarjeta</span></span>';
+      addCard.addEventListener("click", function() { openCardEditor(null); });
+      return addCard;
     }
 
     function fillCategoryFilter(projects) {
@@ -1432,11 +1566,15 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
 
       const projects = filteredProjects();
       gridContainer.innerHTML = "";
-      emptyState.hidden = projects.length > 0;
+      emptyState.hidden = projects.length > 0 || editMode;
 
       projects.forEach(function(project, index) {
         gridContainer.appendChild(createProjectCard(project, index));
       });
+
+      if (CAN_EDIT_CARDS && editMode) {
+        gridContainer.appendChild(createAddCard());
+      }
 
       liveCountEl.textContent = projectsSource.filter(projectIsActive).length;
     }
@@ -1457,6 +1595,53 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
 
     searchInput.addEventListener("input", renderProjects);
     categoryFilter.addEventListener("change", renderProjects);
+
+    if (cardEditorToggle) {
+      cardEditorToggle.addEventListener("click", function() {
+        editMode = !editMode;
+        cardEditorToggle.setAttribute("aria-pressed", String(editMode));
+        cardEditorToggle.querySelector("span").textContent = editMode ? "Finalizar" : "Editar";
+        renderProjects();
+      });
+    }
+
+    function closeCardEditor() {
+      if (cardEditorDialog?.open) cardEditorDialog.close();
+    }
+
+    document.getElementById("cardEditorClose")?.addEventListener("click", closeCardEditor);
+    document.getElementById("cardEditorCancel")?.addEventListener("click", closeCardEditor);
+
+    cardEditorDialog?.addEventListener("click", function(event) {
+      if (event.target === cardEditorDialog) closeCardEditor();
+    });
+
+    cardEditorForm?.addEventListener("submit", async function(event) {
+      event.preventDefault();
+      const submitButton = cardEditorForm.querySelector('[type="submit"]');
+      cardEditorError.hidden = true;
+      submitButton.disabled = true;
+      try {
+        const response = await fetch("/api/admin/applications", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            code: cardEditorForm.elements.cardCode.value,
+            name: cardEditorForm.elements.cardName.value,
+            label: cardEditorForm.elements.cardLabel.value,
+            url: cardEditorForm.elements.cardUrl.value,
+            portalSection: currentPortalSection(),
+          }),
+        });
+        const result = await response.json().catch(function() { return {}; });
+        if (!response.ok) throw new Error(result.error || "No se pudo guardar la tarjeta.");
+        window.location.reload();
+      } catch (error) {
+        cardEditorError.textContent = error.message;
+        cardEditorError.hidden = false;
+        submitButton.disabled = false;
+      }
+    });
 
     new MutationObserver(removeInstallPromptArtifacts).observe(document.body, {
       childList: true,

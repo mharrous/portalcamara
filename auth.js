@@ -60,6 +60,9 @@ export async function handleAuthRoute(request, env, renderers) {
   if (url.pathname === "/api/admin/users" && request.method === "POST") {
     return withAdmin(request, env, (admin) => saveUser(request, env, admin));
   }
+  if (url.pathname === "/api/admin/applications" && request.method === "POST") {
+    return withAdmin(request, env, (admin) => saveApplication(request, env, admin));
+  }
   if (url.pathname === "/api/admin/permissions" && request.method === "POST") {
     return withAdmin(request, env, (admin) => savePermission(request, env, admin));
   }
@@ -91,7 +94,7 @@ async function launchApplication(request, env, applicationCode) {
   const user = await getSessionUser(request, env);
   if (!user) return redirect(`/login?next=${encodeURIComponent(new URL(request.url).pathname)}`);
   const application = await env.AUTH_DB.prepare(`
-    SELECT a.code, a.url
+    SELECT a.code, a.url, a.integration_status
     FROM applications a
     LEFT JOIN user_application_permissions p
       ON p.application_code = a.code AND p.user_id = ?
@@ -105,6 +108,10 @@ async function launchApplication(request, env, applicationCode) {
 
   const destination = new URL(application.url);
   if (destination.protocol !== "https:") return new Response("Destino no válido", { status: 500 });
+  if (application.integration_status === "direct") {
+    await audit(env, user.id, "application.launch", "application", application.code, { mode: "direct" });
+    return redirect(destination.toString(), { "cache-control": "no-store", "referrer-policy": "no-referrer" });
+  }
   const code = randomToken(32);
   const expiresAt = new Date(Date.now() + 45 * 1000).toISOString();
   await env.AUTH_DB.batch([
@@ -217,6 +224,21 @@ export async function allowedApplicationCodes(user, env) {
     WHERE p.user_id = ? AND p.active = 1 AND a.active = 1
   `).bind(user.id).all();
   return new Set((result.results || []).map((row) => row.code));
+}
+
+export async function portalApplications(user, env) {
+  const query = user.role === "admin"
+    ? `SELECT code, name, category, label, portal_section, sort_order, url
+       FROM applications WHERE active = 1
+       ORDER BY portal_section, sort_order, name`
+    : `SELECT a.code, a.name, a.category, a.label, a.portal_section, a.sort_order, a.url
+       FROM applications a
+       JOIN user_application_permissions p ON p.application_code = a.code
+       WHERE p.user_id = ? AND p.active = 1 AND a.active = 1
+       ORDER BY a.portal_section, a.sort_order, a.name`;
+  const statement = env.AUTH_DB.prepare(query);
+  const result = user.role === "admin" ? await statement.all() : await statement.bind(user.id).all();
+  return result.results || [];
 }
 
 async function beginMicrosoftLogin(request, env) {
@@ -386,7 +408,7 @@ async function withAdmin(request, env, operation) {
 async function listAdministrationData(env) {
   const [users, applications, permissions] = await env.AUTH_DB.batch([
     env.AUTH_DB.prepare("SELECT id, legacy_username, display_name, email, role, active, entra_tenant_id, entra_oid, auth_provider, last_login_at FROM users ORDER BY display_name"),
-    env.AUTH_DB.prepare("SELECT code, name, category, url, active, controlled, integration_status FROM applications ORDER BY category, name"),
+    env.AUTH_DB.prepare("SELECT code, name, category, label, portal_section, sort_order, url, active, controlled, integration_status FROM applications ORDER BY portal_section, sort_order, name"),
     env.AUTH_DB.prepare("SELECT user_id, application_code, role, active FROM user_application_permissions"),
   ]);
   return { users: users.results || [], applications: applications.results || [], permissions: permissions.results || [] };
@@ -478,6 +500,64 @@ async function saveUser(request, env, admin) {
   }
   await audit(env, admin.id, id ? "user.update" : "user.create", "user", String(result.id), { email, role, active: Boolean(active) });
   return json({ ok: true, id: result.id });
+}
+
+function applicationSlug(value) {
+  return String(value || "aplicacion")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "aplicacion";
+}
+
+async function saveApplication(request, env, admin) {
+  const payload = await request.json();
+  const existingCode = String(payload.code || "").trim();
+  const name = String(payload.name || "").trim().slice(0, 100);
+  const label = String(payload.label || "").trim().slice(0, 40);
+  const portalSection = payload.portalSection === "innovacion" ? "innovacion" : "root";
+  let destination;
+  try {
+    destination = new URL(String(payload.url || "").trim());
+  } catch {
+    throw new Error("La ruta debe ser una URL completa válida.");
+  }
+  if (!name || !label) throw new Error("El nombre y la etiqueta son obligatorios.");
+  if (destination.protocol !== "https:") throw new Error("La ruta debe comenzar por https://");
+
+  if (existingCode) {
+    if (!/^[a-z0-9-]+$/.test(existingCode)) throw new Error("Código de tarjeta no válido.");
+    const result = await env.AUTH_DB.prepare(`
+      UPDATE applications
+      SET name = ?, category = ?, label = ?, portal_section = ?, url = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE code = ?
+      RETURNING code
+    `).bind(name, label, label, portalSection, destination.toString(), existingCode).first();
+    if (!result) throw new Error("Tarjeta no encontrada.");
+    await audit(env, admin.id, "application.update", "application", existingCode, { name, label, portalSection, url: destination.toString() });
+    return json({ ok: true, code: existingCode });
+  }
+
+  let code = applicationSlug(name);
+  const duplicate = await env.AUTH_DB.prepare("SELECT code FROM applications WHERE code = ?").bind(code).first();
+  if (duplicate) code = `${code.slice(0, 40)}-${crypto.randomUUID().slice(0, 6)}`;
+  const order = await env.AUTH_DB.prepare("SELECT COALESCE(MAX(sort_order), 0) + 10 AS next_order FROM applications WHERE portal_section = ?")
+    .bind(portalSection)
+    .first();
+  await env.AUTH_DB.batch([
+    env.AUTH_DB.prepare(`
+      INSERT INTO applications (code, name, category, label, portal_section, sort_order, url, active, controlled, integration_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, 'direct')
+    `).bind(code, name, label, label, portalSection, Number(order?.next_order || 10), destination.toString()),
+    env.AUTH_DB.prepare(`
+      INSERT INTO user_application_permissions (user_id, application_code, role, active)
+      VALUES (?, ?, 'admin', 1)
+    `).bind(admin.id, code),
+  ]);
+  await audit(env, admin.id, "application.create", "application", code, { name, label, portalSection, url: destination.toString() });
+  return json({ ok: true, code }, 201);
 }
 
 async function savePermission(request, env, admin) {
@@ -574,7 +654,7 @@ function renderSecurityAdminPage(user) {
     function date(value){if(!value)return '—';const normalized=String(value).includes('T')?value:String(value).replace(' ','T')+'Z';return new Date(normalized).toLocaleString('es-ES');}
     function permission(userId,code){return data.permissions.find(function(item){return Number(item.user_id)===Number(userId)&&item.application_code===code;});}
     function device(userAgent){const ua=String(userAgent||'');let browser='Navegador';let system='Dispositivo';if(/Edg\\//.test(ua))browser='Edge';else if(/Chrome\\//.test(ua))browser='Chrome';else if(/Firefox\\//.test(ua))browser='Firefox';else if(/Safari\\//.test(ua))browser='Safari';if(/Windows/.test(ua))system='Windows';else if(/Android/.test(ua))system='Android';else if(/iPhone|iPad/.test(ua))system='iPhone/iPad';else if(/Macintosh/.test(ua))system='Mac';return browser+' · '+system;}
-    function actionLabel(action){return ({'login.success':'Inicio correcto','login.denied':'Acceso rechazado','session.logout':'Cierre de sesión','session.revoke':'Sesión cerrada por admin','session.revoke_user':'Sesiones de usuario cerradas','session.revoke_others':'Otras sesiones cerradas','application.launch':'Aplicación abierta','application.denied':'Aplicación rechazada','permission.update':'Permiso actualizado','user.update':'Usuario actualizado','user.create':'Usuario creado','user.delete':'Usuario eliminado'})[action]||action;}
+    function actionLabel(action){return ({'login.success':'Inicio correcto','login.denied':'Acceso rechazado','session.logout':'Cierre de sesión','session.revoke':'Sesión cerrada por admin','session.revoke_user':'Sesiones de usuario cerradas','session.revoke_others':'Otras sesiones cerradas','application.launch':'Aplicación abierta','application.denied':'Aplicación rechazada','application.create':'Tarjeta creada','application.update':'Tarjeta actualizada','permission.update':'Permiso actualizado','user.update':'Usuario actualizado','user.create':'Usuario creado','user.delete':'Usuario eliminado'})[action]||action;}
     function detailText(event){let detail={};try{detail=JSON.parse(event.detail||'{}');}catch(_){}const parts=[];if(detail.reason)parts.push('Motivo: '+detail.reason);if(detail.email)parts.push(detail.email);if(detail.displayName)parts.push(detail.displayName);if(detail.userId)parts.push('Usuario #'+detail.userId);if(detail.count!==undefined)parts.push(detail.count+' sesiones');if(detail.active!==undefined)parts.push(detail.active?'Activado':'Desactivado');return parts.join(' · ')||'—';}
     function drawUsers(){const body=document.querySelector('#users');body.innerHTML='';data.users.forEach(function(user){const row=document.createElement('tr');row.innerHTML='<td><input data-field="displayName" value="'+esc(user.display_name)+'"><span class="muted">'+(user.entra_oid?'Microsoft vinculado':'Pendiente de primer acceso Microsoft')+'</span></td><td><input data-field="email" type="email" placeholder="nombre@empresa.es" value="'+esc(user.email||'')+'"></td><td><select data-field="role"><option value="user">Usuario</option><option value="admin">Administrador</option></select></td><td><select data-field="active"><option value="1">Activo</option><option value="0">Desactivado</option></select></td><td><div class="apps">'+data.applications.map(function(app){const current=permission(user.id,app.code);return '<label class="perm"><input type="checkbox" data-app="'+esc(app.code)+'" '+(current&&Number(current.active)?'checked':'')+'><span>'+esc(app.name)+'</span></label>';}).join('')+'</div></td><td><div class="actions"><button data-save>Guardar</button><button class="secondary compact" data-sessions>Cerrar sesiones</button><button class="danger compact" data-delete>Borrar</button></div></td>';row.querySelector('[data-field="role"]').value=user.role;row.querySelector('[data-field="active"]').value=String(Number(user.active));row.querySelector('[data-save]').onclick=function(){saveUser(row,user);};row.querySelector('[data-sessions]').onclick=function(){closeUserSessions(user);};row.querySelector('[data-delete]').onclick=function(){removeUser(user);};body.appendChild(row);});}
     function drawSessions(){const body=document.querySelector('#sessions');body.innerHTML='';if(!sessions.length){body.innerHTML='<tr><td colspan="6" class="muted">No hay sesiones activas.</td></tr>';return;}sessions.forEach(function(session){const row=document.createElement('tr');row.innerHTML='<td><strong>'+esc(session.display_name)+'</strong><br><span class="muted">'+esc(session.email||'')+'</span></td><td><span class="device">'+esc(device(session.user_agent))+'</span><br><span class="muted">Microsoft</span></td><td>'+date(session.created_at)+'</td><td>'+date(session.last_seen_at)+'</td><td>'+date(session.expires_at)+'</td><td>'+(session.current?'<span class="tag current">Esta sesión</span>':'<button class="danger compact" data-close>Cerrar</button>')+'</td>';const button=row.querySelector('[data-close]');if(button)button.onclick=function(){closeSession(session);};body.appendChild(row);});}

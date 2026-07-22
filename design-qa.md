@@ -27,3 +27,13 @@
 - P3: none blocking handoff.
 
 final result: passed
+
+## Editor de tarjetas
+
+- El botón de edición sólo aparece para administradores.
+- El modo edición sustituye la navegación por lápices individuales y muestra el marco discontinuo para añadir tarjetas.
+- El formulario recupera nombre, etiqueta y ruta de la tarjeta seleccionada.
+- El formulario de alta comienza vacío y conserva la sección actual del portal.
+- La comprobación se realizó en producción sin guardar datos de prueba y sin errores de consola.
+
+final result: passed
