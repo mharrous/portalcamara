@@ -325,14 +325,14 @@ function escapeHtml(value) {
 }
 
 const PORTAL_THEMES = [
-  { id: "copper", name: "Cobre", colors: ["#263955", "#604c50", "#ef9b6b"] },
-  { id: "ocean", name: "Océano", colors: ["#102a43", "#2e88a8", "#d8c9bb"] },
-  { id: "ceuta", name: "Ceuta", colors: ["#4e0e1b", "#c85b32", "#ffe2a7"] },
-  { id: "forest", name: "Bosque", colors: ["#17372f", "#4f8067", "#d9be7b"] },
-  { id: "violet", name: "Violeta", colors: ["#252044", "#755b89", "#efa487"] },
-  { id: "night", name: "Noche", colors: ["#0e1728", "#334c6f", "#99a8bd"] },
-  { id: "teal", name: "Turquesa", colors: ["#0d3840", "#2f8c85", "#d4d1aa"] },
-  { id: "plum", name: "Ciruela", colors: ["#301a34", "#864455", "#e5a979"] },
+  { id: "copper", name: "Cobre", colors: ["#303a4b", "#6f5f61", "#c89a82"] },
+  { id: "ocean", name: "Océano", colors: ["#233847", "#537889", "#b4b5b2"] },
+  { id: "ceuta", name: "Ceuta", colors: ["#482b31", "#8e5550", "#d6b58b"] },
+  { id: "forest", name: "Bosque", colors: ["#273b37", "#60776a", "#b5a581"] },
+  { id: "violet", name: "Violeta", colors: ["#302d45", "#6b6279", "#b99a8d"] },
+  { id: "night", name: "Noche", colors: ["#202b3a", "#42556b", "#929baa"] },
+  { id: "teal", name: "Turquesa", colors: ["#233f43", "#527776", "#aeb09a"] },
+  { id: "plum", name: "Ciruela", colors: ["#3b2c3d", "#765761", "#bd9780"] },
 ];
 
 function themePickerMarkup(placement) {
@@ -350,14 +350,14 @@ function themePickerMarkup(placement) {
 
 function themeStyles() {
   return `
-    :root { --theme-1:#263955;--theme-2:#3e506c;--theme-3:#604c50;--theme-4:#9f4328;--theme-5:#ef9b6b;--theme-glow-a:#7893b6;--theme-glow-b:#ff9b63; }
-    :root[data-theme="ocean"] { --theme-1:#102a43;--theme-2:#1d5f82;--theme-3:#2e88a8;--theme-4:#6cb7c9;--theme-5:#d8c9bb;--theme-glow-a:#4fb5d2;--theme-glow-b:#e4c9b8; }
-    :root[data-theme="ceuta"] { --theme-1:#4e0e1b;--theme-2:#8c1628;--theme-3:#c85b32;--theme-4:#f1b544;--theme-5:#ffe2a7;--theme-glow-a:#d01c38;--theme-glow-b:#ffd45f; }
-    :root[data-theme="forest"] { --theme-1:#17372f;--theme-2:#276250;--theme-3:#4f8067;--theme-4:#8e9b64;--theme-5:#d9be7b;--theme-glow-a:#57a286;--theme-glow-b:#d4b96f; }
-    :root[data-theme="violet"] { --theme-1:#252044;--theme-2:#4b3f72;--theme-3:#755b89;--theme-4:#ad6f8e;--theme-5:#efa487;--theme-glow-a:#8070ba;--theme-glow-b:#ef9d82; }
-    :root[data-theme="night"] { --theme-1:#0e1728;--theme-2:#1d2d48;--theme-3:#334c6f;--theme-4:#536d8e;--theme-5:#99a8bd;--theme-glow-a:#536f9b;--theme-glow-b:#a7b4c7; }
-    :root[data-theme="teal"] { --theme-1:#0d3840;--theme-2:#14666c;--theme-3:#2f8c85;--theme-4:#71b9a3;--theme-5:#d4d1aa;--theme-glow-a:#48aaa5;--theme-glow-b:#d4c98e; }
-    :root[data-theme="plum"] { --theme-1:#301a34;--theme-2:#5c294f;--theme-3:#864455;--theme-4:#bd685a;--theme-5:#e5a979;--theme-glow-a:#955474;--theme-glow-b:#e4a16f; }
+    :root { --theme-1:#303a4b;--theme-2:#495465;--theme-3:#6f5f61;--theme-4:#9a6d5a;--theme-5:#c89a82;--theme-glow-a:#73839a;--theme-glow-b:#c99a80; }
+    :root[data-theme="ocean"] { --theme-1:#233847;--theme-2:#355565;--theme-3:#537889;--theme-4:#789aaa;--theme-5:#b4b5b2;--theme-glow-a:#6f93a1;--theme-glow-b:#b9aaa4; }
+    :root[data-theme="ceuta"] { --theme-1:#482b31;--theme-2:#6a3e43;--theme-3:#8e5550;--theme-4:#b18260;--theme-5:#d6b58b;--theme-glow-a:#9b5e59;--theme-glow-b:#c6a47e; }
+    :root[data-theme="forest"] { --theme-1:#273b37;--theme-2:#3d5750;--theme-3:#60776a;--theme-4:#86907a;--theme-5:#b5a581;--theme-glow-a:#668478;--theme-glow-b:#aa9d7d; }
+    :root[data-theme="violet"] { --theme-1:#302d45;--theme-2:#4c4862;--theme-3:#6b6279;--theme-4:#8e7582;--theme-5:#b99a8d;--theme-glow-a:#77708c;--theme-glow-b:#b58f83; }
+    :root[data-theme="night"] { --theme-1:#202b3a;--theme-2:#2d3b4d;--theme-3:#42556b;--theme-4:#657489;--theme-5:#929baa;--theme-glow-a:#5e7087;--theme-glow-b:#949ead; }
+    :root[data-theme="teal"] { --theme-1:#233f43;--theme-2:#38595b;--theme-3:#527776;--theme-4:#79968c;--theme-5:#aeb09a;--theme-glow-a:#648985;--theme-glow-b:#a5a98f; }
+    :root[data-theme="plum"] { --theme-1:#3b2c3d;--theme-2:#584052;--theme-3:#765761;--theme-4:#9a7169;--theme-5:#bd9780;--theme-glow-a:#856478;--theme-glow-b:#b79079; }
     .theme-picker { z-index:1000; color:#fff; font-family:Inter,system-ui,sans-serif; }
     .theme-picker-auth { position:fixed; top:28px; right:32px; }
     .theme-picker-portal { position:fixed; top:28px; right:32px; }

@@ -31,6 +31,7 @@ final result: passed
 ## Selector de temas
 
 - El acceso y la pantalla de tarjetas comparten ocho temas de color sobre el mismo degradado y efecto cristal.
+- Las ocho paletas utilizan tonos desaturados y transiciones suaves para reducir el ruido visual.
 - La eleccion se conserva al recargar mediante almacenamiento local del navegador.
 - En la pantalla de tarjetas, el boton queda flotante arriba a la derecha y fuera del bloque de usuario.
 - La paleta queda limitada al portal central; no modifica Jornadas, Reuniones ni las demas aplicaciones enlazadas.
