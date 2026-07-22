@@ -377,11 +377,12 @@ function renderLogin({ error = "", next = "/", microsoftEnabled = false, microso
     body: `
       <div class="login-card">
         <img class="login-logo" src="${LOGO_CAMARA}" alt="Cámara de Ceuta">
-        <p class="login-kicker">Cámara de Ceuta</p>
-        <h1>Acceso al portal</h1>
-        <p class="login-copy">Accede al portal de tarjetas con tu identidad corporativa.</p>
+        <p class="login-kicker">Acceso institucional</p>
+        <h1>Bienvenido al portal</h1>
+        <p class="login-copy">Identifícate con tu cuenta corporativa para acceder a tus trámites y tarjetas.</p>
         ${error ? `<div class="login-error" role="alert">${escapeHtml(error)}</div>` : ""}
-        ${microsoftEnabled ? `<a class="microsoft-button" href="${microsoftStartPath}?next=${encodeURIComponent(sanitizeNextPath(next))}">Entrar con Microsoft</a>` : `<p class="login-help">Microsoft Entra está preparado, pero permanece desactivado hasta completar la configuración.</p>`}
+        ${microsoftEnabled ? `<a class="microsoft-button" href="${microsoftStartPath}?next=${encodeURIComponent(sanitizeNextPath(next))}"><img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" alt="" aria-hidden="true">Entrar con Microsoft</a>` : `<p class="login-help">Microsoft Entra está preparado, pero permanece desactivado hasta completar la configuración.</p>`}
+        <div class="login-trust">Conexión cifrada <span>·</span> Uso exclusivo autorizado</div>
       </div>
     `,
   });
@@ -405,24 +406,35 @@ function renderAuthShell({ title, body }) {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    :root { --navy: #0b2d4d; --red: #e11d2f; --gold: #d6b20e; --border: rgba(11,45,77,.14); --text: #111827; --soft: #667085; }
+    :root { --navy: #0c2944; --blue: #327fa5; --red: #dd1931; --gold: #ffd400; --text: #f8fbff; --soft: rgba(241,248,255,.78); }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; font-family: Inter, system-ui, sans-serif; color: var(--text); background: radial-gradient(circle at 12% 14%, rgba(225,29,47,.18), transparent 28%), radial-gradient(circle at 92% 16%, rgba(214,178,14,.20), transparent 30%), #f5f2ed; }
-    .login-card { width: min(440px, 100%); padding: 34px; border: 1px solid var(--border); border-top: 6px solid var(--red); border-radius: 26px; background: rgba(255,255,255,.92); box-shadow: 0 28px 80px rgba(11,45,77,.16); }
-    .login-logo { width: 150px; height: auto; display: block; margin-bottom: 24px; }
-    .login-kicker { margin: 0 0 8px; color: var(--red); font: 700 12px/1 "JetBrains Mono", monospace; letter-spacing: .22em; text-transform: uppercase; }
-    h1 { margin: 0 0 10px; font: 700 34px/1.05 "Space Grotesk", Inter, sans-serif; color: var(--navy); }
-    .login-copy, .login-help { margin: 0 0 22px; color: var(--soft); line-height: 1.55; }
-    .login-error { margin: 0 0 18px; padding: 12px 14px; border-radius: 14px; color: #981b1b; background: #fff1f2; border: 1px solid rgba(225,29,47,.22); font-weight: 700; }
-    label { display: grid; gap: 8px; margin-bottom: 16px; color: var(--navy); font-weight: 800; }
-    input { width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; font: 600 16px Inter, sans-serif; outline: none; background: #fff; }
-    input:focus { border-color: var(--red); box-shadow: 0 0 0 4px rgba(225,29,47,.12); }
-    button, .microsoft-button { display: block; width: 100%; border: 0; border-radius: 999px; padding: 15px 20px; color: #fff; background: linear-gradient(135deg, var(--red), #f32d45); box-shadow: 0 18px 36px rgba(225,29,47,.24); font: 800 16px Inter, sans-serif; text-align: center; text-decoration: none; cursor: pointer; }
+    body { margin: 0; min-height: 100vh; overflow-x: hidden; font-family: Inter, system-ui, sans-serif; color: var(--text); background: linear-gradient(118deg, #143550 0%, #246b91 48%, #5796b6 78%, #ecd0bd 125%); }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.08), transparent 32%), linear-gradient(180deg, rgba(5,25,43,.15), transparent 38%); }
+    .auth-shell { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 34px 40px 36px; }
+    .auth-brand { display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,.94); font: 600 11px/1 "JetBrains Mono", monospace; letter-spacing: .3em; text-transform: uppercase; }
+    .auth-brand::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 18px rgba(255,255,255,.45); }
+    .auth-main { display: grid; place-items: center; padding: 48px 0; }
+    .login-card { width: min(460px, 100%); padding: 42px 40px 38px; text-align: center; border: 1px solid rgba(255,255,255,.34); border-radius: 24px; background: linear-gradient(150deg, rgba(255,255,255,.18), rgba(183,225,246,.12)); box-shadow: 0 28px 90px rgba(4,30,50,.22); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+    .login-logo { width: 190px; max-height: 80px; object-fit: contain; display: block; margin: 0 auto 30px; }
+    .login-kicker { margin: 0 0 16px; color: rgba(244,250,255,.72); font: 600 10px/1 "JetBrains Mono", monospace; letter-spacing: .38em; text-transform: uppercase; }
+    h1 { margin: 0 0 12px; font: 700 31px/1.08 "Space Grotesk", Inter, sans-serif; letter-spacing: -.025em; color: #fff; }
+    .login-copy, .login-help { max-width: 370px; margin: 0 auto 32px; color: var(--soft); font-size: 15px; line-height: 1.6; }
+    .login-error { margin: 0 0 20px; padding: 12px 14px; border-radius: 12px; color: #fff; background: rgba(149,16,35,.58); border: 1px solid rgba(255,255,255,.22); font-weight: 700; }
+    label { display: grid; gap: 8px; margin-bottom: 16px; color: #fff; font-weight: 800; text-align: left; }
+    input { width: 100%; border: 1px solid rgba(255,255,255,.28); border-radius: 14px; padding: 14px 16px; color: #fff; font: 600 16px Inter, sans-serif; outline: none; background: rgba(255,255,255,.12); }
+    input:focus { border-color: rgba(255,255,255,.68); box-shadow: 0 0 0 4px rgba(255,255,255,.1); }
+    button, .microsoft-button { display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: center; gap: 13px; border: 1px solid rgba(255,255,255,.7); border-radius: 12px; padding: 14px 20px; color: var(--navy); background: rgba(255,255,255,.97); box-shadow: 0 12px 28px rgba(7,36,57,.18); font: 800 16px Inter, sans-serif; text-align: center; text-decoration: none; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
+    button:hover, .microsoft-button:hover { transform: translateY(-2px); background: #fff; box-shadow: 0 18px 34px rgba(7,36,57,.25); }
+    .microsoft-button img { width: 18px; height: 18px; }
+    .login-trust { margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.22); color: rgba(241,248,255,.6); font-size: 11px; }
+    .login-trust span { padding: 0 5px; }
     .login-separator { display: flex; align-items: center; gap: 10px; margin: 22px 0 16px; color: var(--soft); font-size: 12px; font-weight: 800; text-transform: uppercase; }
-    .login-separator::before, .login-separator::after { content: ""; height: 1px; flex: 1; background: var(--border); }
+    .login-separator::before, .login-separator::after { content: ""; height: 1px; flex: 1; background: rgba(255,255,255,.2); }
+    .auth-footer { display: flex; justify-content: space-between; gap: 20px; color: rgba(242,248,255,.72); font: 500 11px/1.3 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; }
+    @media (max-width: 640px) { .auth-shell { padding: 24px 20px; } .auth-main { padding: 32px 0; } .login-card { padding: 34px 24px 30px; } .login-logo { width: 165px; } .auth-footer { flex-direction: column; align-items: center; text-align: center; } h1 { font-size: 28px; } }
   </style>
 </head>
-<body>${body}</body>
+<body><div class="auth-shell"><div class="auth-brand">Cámara Oficial · Ceuta</div><main class="auth-main">${body}</main><footer class="auth-footer"><span>Portal corporativo · V3.2</span><span>Seguridad Microsoft Entra ID</span></footer></div></body>
 </html>`;
 }
 
@@ -982,6 +994,155 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
         transform: none;
       }
     }
+
+    /* Glass Ocean theme */
+    :root {
+      --bg: #173e5d;
+      --surface: rgba(255,255,255,.16);
+      --border: rgba(255,255,255,.24);
+      --text: #f8fbff;
+      --text-soft: rgba(241,248,255,.76);
+      --text-faint: rgba(232,243,251,.56);
+      --navy: #102d48;
+      --red: #ed1b36;
+      --red-dark: #bd1127;
+      --gold: #ffd400;
+      --soon: rgba(255,255,255,.18);
+      --radius: 20px;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      background: linear-gradient(118deg, #133651 0%, #236b91 49%, #5a99b9 80%, #ecd0bd 126%);
+      color: var(--text);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 52% 22%, rgba(255,255,255,.09), transparent 34%), linear-gradient(180deg, rgba(5,26,43,.16), transparent 42%);
+    }
+
+    .glow { opacity: .18; filter: blur(110px); }
+    .glow-a { background: radial-gradient(circle, #8dcced, transparent 70%); }
+    .glow-b { background: radial-gradient(circle, #f4d3bc, transparent 70%); }
+
+    .page { width: min(1120px, calc(100% - 48px)); padding: 34px 0 44px; }
+
+    .topbar {
+      margin-bottom: 24px;
+      padding: 16px 18px;
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 22px;
+      background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(202,231,247,.09));
+      box-shadow: 0 20px 52px rgba(4,28,47,.14);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .logo-chip {
+      width: 68px;
+      height: 68px;
+      border-color: rgba(255,255,255,.28);
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 12px 28px rgba(5,31,51,.16);
+    }
+
+    .kicker { color: rgba(247,251,255,.72); letter-spacing: .26em; }
+    h1 { color: #fff; font-size: clamp(28px, 3.8vw, 40px); }
+
+    .session-card,
+    .stat {
+      border-color: rgba(255,255,255,.22);
+      background: rgba(255,255,255,.14);
+      box-shadow: none;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .session-card { min-width: 400px; }
+    .session-name, .session-link { color: #fff; }
+    .session-role { color: rgba(255,255,255,.75); background: rgba(255,255,255,.12); }
+    .session-avatar { color: #fff; background: linear-gradient(145deg, rgba(237,27,54,.82), rgba(183,31,71,.58)); }
+    .session-links { border-color: rgba(255,255,255,.2); }
+    .session-link:hover, .session-link:focus-visible { color: #fff; background: rgba(255,255,255,.12); }
+    .logout-link { color: #ffdce2; }
+    .stat-value { color: #fff; }
+    .stat-label { color: rgba(255,255,255,.66); }
+
+    .controls {
+      grid-template-columns: minmax(0,1fr) 230px 148px;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 20px;
+      background: rgba(255,255,255,.09);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .field-search,
+    .field-select,
+    .back-button {
+      border-color: rgba(255,255,255,.25);
+      background: rgba(255,255,255,.9);
+      color: var(--navy);
+      box-shadow: 0 10px 24px rgba(5,31,51,.1);
+    }
+
+    .field-search input { color: var(--navy); }
+    .field-search input::placeholder { color: rgba(16,45,72,.5); }
+    .field-search:focus-within, .field-select:focus { border-color: rgba(255,255,255,.9); box-shadow: 0 0 0 4px rgba(255,255,255,.13); }
+
+    .grid { grid-template-columns: repeat(auto-fill, minmax(265px, 1fr)); gap: 18px; }
+
+    .card {
+      min-height: 218px;
+      border-color: rgba(255,255,255,.25);
+      background: linear-gradient(150deg, rgba(255,255,255,.2), rgba(190,225,244,.1));
+      box-shadow: 0 18px 46px rgba(4,29,48,.14);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .card-live:hover,
+    .card-live:focus-visible {
+      border-color: rgba(255,255,255,.52);
+      box-shadow: 0 24px 54px rgba(4,29,48,.22);
+    }
+
+    .card-icon { background: linear-gradient(145deg, #193c5a, #e51b37); box-shadow: 0 10px 24px rgba(6,31,51,.2); }
+    .card-title { color: #fff; }
+    .card-tag { color: rgba(255,255,255,.84); background: rgba(255,255,255,.12); }
+    .card-foot { border-color: rgba(255,255,255,.18); }
+    .card-status { color: #ffccd3; }
+    .card-cta { color: #fff; }
+    .card-live:hover .card-cta, .card-live:focus-visible .card-cta { color: #fff; }
+    .card-dot { background: var(--gold); box-shadow: 0 0 0 4px rgba(255,212,0,.18); }
+    .card-soon { opacity: .58; }
+    .card-soon .card-icon { background: rgba(255,255,255,.15); color: rgba(255,255,255,.7); }
+    .empty-state { color: var(--text-soft); }
+
+    .footbar { border-color: rgba(255,255,255,.2); color: rgba(244,249,253,.62); }
+
+    @media (max-width: 760px) {
+      .page { width: min(100% - 28px, 1120px); padding-top: 20px; }
+      .topbar { align-items: flex-start; padding: 15px; }
+      .header-actions { width: 100%; flex-direction: column; }
+      .session-card { min-width: 0; width: 100%; }
+      .controls { grid-template-columns: 1fr; padding: 12px; }
+      .stat { width: fit-content; min-width: 0; flex-direction: row; gap: 8px; padding: 8px 14px; border-radius: 999px; }
+    }
+
+    @media (max-width: 440px) {
+      .brand { gap: 12px; }
+      .logo-chip { width: 56px; height: 56px; border-radius: 15px; }
+      .topbar { border-radius: 18px; }
+      .session-card { grid-template-columns: 1fr; gap: 9px; }
+      .session-links { justify-content: flex-end; padding-top: 8px; padding-left: 0; border-top: 1px solid rgba(255,255,255,.18); border-left: 0; }
+    }
   </style>
 </head>
 <body>
@@ -1039,7 +1200,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
 
     <footer class="footbar">
       <p>Actualizado el <span id="today"></span></p>
-      <p>Añade proyectos nuevos editando <strong>PROYECTOS</strong> al principio de <strong>worker.js</strong></p>
+      <p>Portal corporativo · Cámara Oficial de Comercio de Ceuta</p>
     </footer>
   </main>
 
