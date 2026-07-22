@@ -4,6 +4,8 @@ Thumbs.db
 .env.*
 node_modules/
 .wrangler/
+backups/
+*.sql.enc
 .wrangler-dry-run/
 .dev.vars
 .auth-local-secret.json

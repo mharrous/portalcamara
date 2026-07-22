@@ -1,0 +1,46 @@
+name: Copia cifrada D1
+
+on:
+  schedule:
+    - cron: "15 3 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Exportar D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p backups
+          npx wrangler d1 export portal-camara-auth --remote --output="backups/portal-camara-auth-$(date -u +%Y%m%d-%H%M%S).sql"
+
+      - name: Cifrar copia
+        env:
+          BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.BACKUP_ENCRYPTION_PASSWORD }}
+        run: |
+          test -n "$BACKUP_ENCRYPTION_PASSWORD"
+          sql_file=$(find backups -name '*.sql' -type f -print -quit)
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in "$sql_file" -out "$sql_file.enc" -pass env:BACKUP_ENCRYPTION_PASSWORD
+          rm "$sql_file"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portal-camara-auth-backup
+          path: backups/*.enc
+          retention-days: 90
+          if-no-files-found: error

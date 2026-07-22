@@ -117,3 +117,5 @@ El mismo valor se configura en el Worker del calendario como `PORTAL_SSO_SECRET`
 ## Seguridad
 
 No subas secretos, tokens, contraseñas ni claves privadas al repositorio.
+
+La administración central incluye usuarios, sesiones activas, actividad y estado de copias en `/admin/users`. El procedimiento de exportación y recuperación está documentado en `BACKUP_RECOVERY.md`.

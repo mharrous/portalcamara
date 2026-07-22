@@ -23,6 +23,9 @@ export function loginOptions(env) {
 
 export async function handleAuthRoute(request, env, renderers) {
   const url = new URL(request.url);
+  if (["POST", "DELETE"].includes(request.method) && url.pathname.startsWith("/api/admin/") && !sameOrigin(request)) {
+    return json({ error: "Origen no permitido" }, 403);
+  }
 
   const applicationLaunchMatch = url.pathname.match(/^\/api\/apps\/([a-z0-9-]+)\/launch$/);
   if (applicationLaunchMatch && request.method === "GET") {
@@ -49,7 +52,7 @@ export async function handleAuthRoute(request, env, renderers) {
     const user = await getSessionUser(request, env);
     if (!user) return redirect(`/login?next=${encodeURIComponent(ADMIN_PATH)}`);
     if (user.role !== "admin") return renderers.html(renderers.forbidden(), { status: 403 });
-    return renderers.html(renderAdminPage(user));
+    return renderers.html(renderSecurityAdminPage(user));
   }
   if (url.pathname === "/api/admin/users" && request.method === "GET") {
     return withAdmin(request, env, async () => json(await listAdministrationData(env)));
@@ -59,6 +62,23 @@ export async function handleAuthRoute(request, env, renderers) {
   }
   if (url.pathname === "/api/admin/permissions" && request.method === "POST") {
     return withAdmin(request, env, (admin) => savePermission(request, env, admin));
+  }
+  if (url.pathname === "/api/admin/activity" && request.method === "GET") {
+    return withAdmin(request, env, async () => json({ events: await listActivity(env) }));
+  }
+  if (url.pathname === "/api/admin/sessions" && request.method === "GET") {
+    return withAdmin(request, env, async (admin) => json({ sessions: await listSessions(env, admin.sessionId) }));
+  }
+  if (url.pathname === "/api/admin/sessions" && request.method === "DELETE") {
+    return withAdmin(request, env, (admin) => revokeOtherSessions(env, admin));
+  }
+  const sessionMatch = url.pathname.match(/^\/api\/admin\/sessions\/(\d+)$/);
+  if (sessionMatch && request.method === "DELETE") {
+    return withAdmin(request, env, (admin) => revokeSession(Number(sessionMatch[1]), env, admin));
+  }
+  const userSessionsMatch = url.pathname.match(/^\/api\/admin\/users\/(\d+)\/sessions$/);
+  if (userSessionsMatch && request.method === "DELETE") {
+    return withAdmin(request, env, (admin) => revokeUserSessions(Number(userSessionsMatch[1]), env, admin));
   }
   const deleteUserMatch = url.pathname.match(/^\/api\/admin\/users\/(\d+)$/);
   if (deleteUserMatch && request.method === "DELETE") {
@@ -78,7 +98,10 @@ async function launchApplication(request, env, applicationCode) {
     WHERE a.code = ? AND a.active = 1
       AND p.active = 1
   `).bind(user.id, applicationCode).first();
-  if (!application) return new Response("Acceso denegado", { status: 403 });
+  if (!application) {
+    await audit(env, user.id, "application.denied", "application", applicationCode, {});
+    return new Response("Acceso denegado", { status: 403 });
+  }
 
   const destination = new URL(application.url);
   if (destination.protocol !== "https:") return new Response("Destino no válido", { status: 500 });
@@ -89,6 +112,7 @@ async function launchApplication(request, env, applicationCode) {
     env.AUTH_DB.prepare("INSERT INTO login_codes (code_hash, user_id, application_code, expires_at) VALUES (?, ?, ?, ?)")
       .bind(await sha256Text(code), user.id, application.code, expiresAt),
   ]);
+  await audit(env, user.id, "application.launch", "application", application.code, {});
   destination.pathname = "/api/auth/portal";
   destination.search = new URLSearchParams({ code }).toString();
   destination.hash = "";
@@ -155,7 +179,9 @@ async function requireCalendarService(request, env) {
 
 export async function logoutResponse(request, env, destination = "/login") {
   const token = readCookie(request, SESSION_COOKIE);
+  const user = token ? await getSessionUser(request, env) : null;
   if (token) await env.AUTH_DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Text(token)).run();
+  if (user) await audit(env, user.id, "session.logout", "session", String(user.sessionId || ""), {});
   return redirect(destination, { "set-cookie": clearSessionCookie() });
 }
 
@@ -165,7 +191,7 @@ export async function getSessionUser(request, env) {
   const tokenHash = await sha256Text(token);
   const row = await env.AUTH_DB.prepare(`
     SELECT u.id, u.legacy_username, u.display_name, u.email, u.role, u.active,
-           u.entra_tenant_id, u.entra_oid, s.provider, s.expires_at
+           u.entra_tenant_id, u.entra_oid, s.id AS session_id, s.provider, s.expires_at, s.user_agent
     FROM sessions s
     JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ? AND s.expires_at > CURRENT_TIMESTAMP
@@ -226,8 +252,14 @@ async function finishMicrosoftLogin(request, env, renderers) {
   const state = String(params.get("state") || "");
   const code = String(params.get("code") || "");
   const oauthError = String(params.get("error_description") || params.get("error") || "");
-  if (oauthError) return renderers.html(renderers.forbidden("Microsoft no pudo completar el acceso."), { status: 401 });
-  if (!state || !code) return renderers.html(renderers.forbidden("La respuesta de Microsoft no es válida."), { status: 400 });
+  if (oauthError) {
+    await audit(env, null, "login.denied", "authentication", "microsoft", { reason: "microsoft_error" });
+    return renderers.html(renderers.forbidden("Microsoft no pudo completar el acceso."), { status: 401 });
+  }
+  if (!state || !code) {
+    await audit(env, null, "login.denied", "authentication", "microsoft", { reason: "invalid_response" });
+    return renderers.html(renderers.forbidden("La respuesta de Microsoft no es válida."), { status: 400 });
+  }
 
   const stateHash = await sha256Text(state);
   const saved = await env.AUTH_DB.prepare(`
@@ -235,7 +267,10 @@ async function finishMicrosoftLogin(request, env, renderers) {
     WHERE state_hash = ? AND expires_at > CURRENT_TIMESTAMP
     RETURNING code_verifier, nonce, return_to
   `).bind(stateHash).first();
-  if (!saved) return renderers.html(renderers.forbidden("El intento de acceso ha caducado o ya fue utilizado."), { status: 400 });
+  if (!saved) {
+    await audit(env, null, "login.denied", "authentication", "microsoft", { reason: "expired_state" });
+    return renderers.html(renderers.forbidden("El intento de acceso ha caducado o ya fue utilizado."), { status: 400 });
+  }
 
   const tokenResponse = await fetch(`https://login.microsoftonline.com/${encodeURIComponent(env.ENTRA_TENANT_ID)}/oauth2/v2.0/token`, {
     method: "POST",
@@ -250,13 +285,24 @@ async function finishMicrosoftLogin(request, env, renderers) {
       scope: "openid profile email",
     }),
   });
-  if (!tokenResponse.ok) return renderers.html(renderers.forbidden("Microsoft rechazó el intercambio de autorización."), { status: 401 });
+  if (!tokenResponse.ok) {
+    await audit(env, null, "login.denied", "authentication", "microsoft", { reason: "token_exchange" });
+    return renderers.html(renderers.forbidden("Microsoft rechazó el intercambio de autorización."), { status: 401 });
+  }
   const tokens = await tokenResponse.json();
   const claims = await validateIdToken(tokens.id_token, env, saved.nonce);
   const user = await findAndLinkMicrosoftUser(claims, env);
-  if (!user) return renderers.html(renderers.forbidden("Tu cuenta no ha sido autorizada por un administrador."), { status: 403 });
-  if (!user.active) return renderers.html(renderers.forbidden("Tu usuario está desactivado."), { status: 403 });
-  const cookie = await createDatabaseSession(user.id, "microsoft", env);
+  const claimedEmail = String(claims.preferred_username || claims.email || "").trim().toLowerCase();
+  if (!user) {
+    await audit(env, null, "login.denied", "authentication", "microsoft", { reason: "user_not_authorized", email: claimedEmail });
+    return renderers.html(renderers.forbidden("Tu cuenta no ha sido autorizada por un administrador."), { status: 403 });
+  }
+  if (!user.active) {
+    await audit(env, user.id, "login.denied", "user", String(user.id), { reason: "user_inactive" });
+    return renderers.html(renderers.forbidden("Tu usuario está desactivado."), { status: 403 });
+  }
+  const cookie = await createDatabaseSession(user.id, "microsoft", request, env);
+  await audit(env, user.id, "login.success", "user", String(user.id), { provider: "microsoft" });
   return redirect(sanitizeNextPath(saved.return_to), { "set-cookie": cookie });
 }
 
@@ -315,12 +361,13 @@ async function findAndLinkMicrosoftUser(claims, env) {
   return row ? normalizeUser(row) : null;
 }
 
-async function createDatabaseSession(userId, provider, env) {
+async function createDatabaseSession(userId, provider, request, env) {
   const token = randomToken(48);
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString();
   await env.AUTH_DB.batch([
     env.AUTH_DB.prepare("DELETE FROM sessions WHERE expires_at <= CURRENT_TIMESTAMP"),
-    env.AUTH_DB.prepare("INSERT INTO sessions (token_hash, user_id, provider, expires_at) VALUES (?, ?, ?, ?)").bind(await sha256Text(token), userId, provider, expiresAt),
+    env.AUTH_DB.prepare("INSERT INTO sessions (token_hash, user_id, provider, expires_at, user_agent) VALUES (?, ?, ?, ?, ?)")
+      .bind(await sha256Text(token), userId, provider, expiresAt, String(request.headers.get("user-agent") || "").slice(0, 500)),
   ]);
   return `${SESSION_COOKIE}=${token}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
@@ -343,6 +390,65 @@ async function listAdministrationData(env) {
     env.AUTH_DB.prepare("SELECT user_id, application_code, role, active FROM user_application_permissions"),
   ]);
   return { users: users.results || [], applications: applications.results || [], permissions: permissions.results || [] };
+}
+
+async function listSessions(env, currentSessionId) {
+  await env.AUTH_DB.prepare("DELETE FROM sessions WHERE expires_at <= CURRENT_TIMESTAMP").run();
+  const result = await env.AUTH_DB.prepare(`
+    SELECT s.id, s.user_id, s.provider, s.created_at, s.last_seen_at, s.expires_at, s.user_agent,
+           u.display_name, u.email
+    FROM sessions s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.expires_at > CURRENT_TIMESTAMP
+    ORDER BY s.last_seen_at DESC
+  `).all();
+  return (result.results || []).map((session) => ({
+    ...session,
+    current: Number(session.id) === Number(currentSessionId),
+  }));
+}
+
+async function listActivity(env) {
+  const result = await env.AUTH_DB.prepare(`
+    SELECT a.id, a.action, a.target_type, a.target_id, a.detail, a.created_at,
+           u.display_name AS actor_name, u.email AS actor_email
+    FROM audit_log a
+    LEFT JOIN users u ON u.id = a.actor_user_id
+    ORDER BY a.id DESC
+    LIMIT 200
+  `).all();
+  return result.results || [];
+}
+
+async function revokeSession(sessionId, env, admin) {
+  if (!sessionId) throw new Error("Sesión no válida.");
+  if (sessionId === Number(admin.sessionId)) throw new Error("Usa Salir para cerrar tu sesión actual.");
+  const target = await env.AUTH_DB.prepare(`
+    SELECT s.id, s.user_id, u.display_name
+    FROM sessions s JOIN users u ON u.id = s.user_id
+    WHERE s.id = ?
+  `).bind(sessionId).first();
+  if (!target) throw new Error("La sesión ya no existe.");
+  await env.AUTH_DB.prepare("DELETE FROM sessions WHERE id = ?").bind(sessionId).run();
+  await audit(env, admin.id, "session.revoke", "session", String(sessionId), { userId: Number(target.user_id), displayName: target.display_name });
+  return json({ ok: true });
+}
+
+async function revokeUserSessions(userId, env, admin) {
+  if (!userId) throw new Error("Usuario no válido.");
+  const target = await env.AUTH_DB.prepare("SELECT id, display_name FROM users WHERE id = ?").bind(userId).first();
+  if (!target) throw new Error("Usuario no encontrado.");
+  const result = userId === admin.id
+    ? await env.AUTH_DB.prepare("DELETE FROM sessions WHERE user_id = ? AND id != ?").bind(userId, admin.sessionId).run()
+    : await env.AUTH_DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId).run();
+  await audit(env, admin.id, "session.revoke_user", "user", String(userId), { displayName: target.display_name, count: Number(result.meta?.changes || 0) });
+  return json({ ok: true, count: Number(result.meta?.changes || 0) });
+}
+
+async function revokeOtherSessions(env, admin) {
+  const result = await env.AUTH_DB.prepare("DELETE FROM sessions WHERE user_id = ? AND id != ?").bind(admin.id, admin.sessionId).run();
+  await audit(env, admin.id, "session.revoke_others", "user", String(admin.id), { count: Number(result.meta?.changes || 0) });
+  return json({ ok: true, count: Number(result.meta?.changes || 0) });
 }
 
 async function saveUser(request, env, admin) {
@@ -410,6 +516,84 @@ async function audit(env, actorUserId, action, targetType, targetId, detail) {
   `).bind(actorUserId, action, targetType, targetId, JSON.stringify(detail || {})).run();
 }
 
+function renderSecurityAdminPage(user) {
+  const safeName = escapeHtml(user.displayName || user.username || "Administrador");
+  return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Administración del portal</title>
+  <style>
+    :root{font-family:Inter,system-ui,sans-serif;color:#17202a;background:#f6f3ee}*{box-sizing:border-box}body{margin:0}.wrap{width:min(1240px,calc(100% - 32px));margin:28px auto 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}.top h1{margin:4px 0 0;color:#8f1724;font-size:30px}.muted{color:#6b7280;font-size:13px}.button,button{border:0;border-radius:12px;padding:11px 16px;background:#a7192b;color:#fff;font-weight:800;text-decoration:none;cursor:pointer}.secondary{background:#fff;color:#25364a;border:1px solid #d9d0c5}.danger{background:#fff;color:#a7192b;border:1px solid #d8a5ad}.compact{padding:8px 11px;font-size:12px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button{background:#fff;color:#5c2730;border:1px solid #dfd2c7}.tabs button.active{background:#8f1724;color:#fff;border-color:#8f1724}.panel{background:#fff;border:1px solid #e3d9ce;border-radius:20px;padding:22px;box-shadow:0 16px 40px rgba(31,41,55,.08)}.panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}.panel h2{margin:0 0 5px}.notice{margin:0 0 14px;padding:11px 13px;border-radius:10px;background:#fff4ce;color:#684d00}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px 9px;border-bottom:1px solid #eee4da;vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#765e62;background:#fcfaf7}input,select{width:100%;padding:9px;border:1px solid #d8cec2;border-radius:9px;background:#fff}.apps{display:grid;gap:9px;min-width:230px}.perm{display:grid;grid-template-columns:22px 1fr;align-items:center;gap:7px}.actions{display:grid;gap:7px;min-width:128px}.tag{display:inline-flex;padding:5px 8px;border-radius:999px;background:#f3eadc;color:#6d4b16;font-size:11px;font-weight:800}.tag.current{background:#dcfce7;color:#166534}.device{font-weight:800}.event{font-weight:800;color:#51232b}.detail{max-width:370px;white-space:normal;color:#596273}.backup-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.backup-card{border:1px solid #e6ddd3;border-radius:16px;padding:17px;background:#fcfaf7}.backup-card h3{margin:0 0 7px}.backup-card p{margin:0;line-height:1.5;color:#596273}.backup-card code{font-size:12px}.hidden{display:none!important}@media(max-width:850px){.top,.panel-head{align-items:stretch;flex-direction:column}.top .button,.panel-head button{width:100%;text-align:center}.backup-grid{grid-template-columns:1fr}table{min-width:900px}.wrap{width:min(100% - 20px,1240px);margin-top:16px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="top"><div><p class="muted">Sesión: ${safeName}</p><h1>Administración del portal</h1></div><a class="button secondary" href="/">Volver al portal</a></div>
+    <div id="notice" class="notice" hidden></div>
+    <nav class="tabs" aria-label="Secciones de administración">
+      <button class="active" data-tab="users">Usuarios y permisos</button>
+      <button data-tab="sessions">Sesiones activas</button>
+      <button data-tab="activity">Actividad</button>
+      <button data-tab="backups">Copias de seguridad</button>
+    </nav>
+
+    <section class="panel" data-section="users">
+      <div class="panel-head"><div><h2>Usuarios y permisos</h2><p class="muted">Identidades Microsoft, aplicaciones autorizadas y cierre de sesiones.</p></div><button id="newUser">Añadir usuario</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Email Microsoft</th><th>Acceso</th><th>Estado</th><th>Aplicaciones</th><th>Acciones</th></tr></thead><tbody id="users"></tbody></table></div>
+    </section>
+
+    <section class="panel hidden" data-section="sessions">
+      <div class="panel-head"><div><h2>Sesiones activas</h2><p class="muted">Dispositivos conectados, última actividad y fecha de caducidad.</p></div><button class="secondary" id="closeOtherSessions">Cerrar mis otras sesiones</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Dispositivo</th><th>Inicio</th><th>Última actividad</th><th>Caduca</th><th>Acción</th></tr></thead><tbody id="sessions"></tbody></table></div>
+    </section>
+
+    <section class="panel hidden" data-section="activity">
+      <div class="panel-head"><div><h2>Actividad reciente</h2><p class="muted">Últimos 200 eventos de seguridad y administración. No se almacenan direcciones IP.</p></div><button class="secondary" id="refreshActivity">Actualizar</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Responsable</th><th>Acción</th><th>Objetivo</th><th>Detalle</th></tr></thead><tbody id="activity"></tbody></table></div>
+    </section>
+
+    <section class="panel hidden" data-section="backups">
+      <div class="panel-head"><div><h2>Copias y recuperación</h2><p class="muted">Protección de la base central antes de cambios y migraciones.</p></div></div>
+      <div class="backup-grid">
+        <article class="backup-card"><h3>Time Travel</h3><p>D1 mantiene recuperación automática por punto temporal. Consulta el estado antes de cualquier migración con <code>wrangler d1 time-travel info</code>.</p></article>
+        <article class="backup-card"><h3>Exportación cifrada</h3><p>El repositorio incluye una tarea mensual preparada. Requiere configurar los secretos de GitHub indicados en <code>BACKUP_RECOVERY.md</code>.</p></article>
+        <article class="backup-card"><h3>Restauración</h3><p>La restauración sobrescribe producción. Debe seguirse el procedimiento documentado y realizar una comprobación trimestral.</p></article>
+      </div>
+    </section>
+  </main>
+  <script>
+    let data={users:[],applications:[],permissions:[]};let sessions=[];let events=[];
+    const notice=document.querySelector('#notice');
+    function esc(value){return String(value??'').replace(/[&<>"']/g,function(character){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character];});}
+    function show(message){notice.textContent=message;notice.hidden=false;window.scrollTo({top:0,behavior:'smooth'});}
+    function date(value){if(!value)return '—';const normalized=String(value).includes('T')?value:String(value).replace(' ','T')+'Z';return new Date(normalized).toLocaleString('es-ES');}
+    function permission(userId,code){return data.permissions.find(function(item){return Number(item.user_id)===Number(userId)&&item.application_code===code;});}
+    function device(userAgent){const ua=String(userAgent||'');let browser='Navegador';let system='Dispositivo';if(/Edg\\//.test(ua))browser='Edge';else if(/Chrome\\//.test(ua))browser='Chrome';else if(/Firefox\\//.test(ua))browser='Firefox';else if(/Safari\\//.test(ua))browser='Safari';if(/Windows/.test(ua))system='Windows';else if(/Android/.test(ua))system='Android';else if(/iPhone|iPad/.test(ua))system='iPhone/iPad';else if(/Macintosh/.test(ua))system='Mac';return browser+' · '+system;}
+    function actionLabel(action){return ({'login.success':'Inicio correcto','login.denied':'Acceso rechazado','session.logout':'Cierre de sesión','session.revoke':'Sesión cerrada por admin','session.revoke_user':'Sesiones de usuario cerradas','session.revoke_others':'Otras sesiones cerradas','application.launch':'Aplicación abierta','application.denied':'Aplicación rechazada','permission.update':'Permiso actualizado','user.update':'Usuario actualizado','user.create':'Usuario creado','user.delete':'Usuario eliminado'})[action]||action;}
+    function detailText(event){let detail={};try{detail=JSON.parse(event.detail||'{}');}catch(_){}const parts=[];if(detail.reason)parts.push('Motivo: '+detail.reason);if(detail.email)parts.push(detail.email);if(detail.displayName)parts.push(detail.displayName);if(detail.userId)parts.push('Usuario #'+detail.userId);if(detail.count!==undefined)parts.push(detail.count+' sesiones');if(detail.active!==undefined)parts.push(detail.active?'Activado':'Desactivado');return parts.join(' · ')||'—';}
+    function drawUsers(){const body=document.querySelector('#users');body.innerHTML='';data.users.forEach(function(user){const row=document.createElement('tr');row.innerHTML='<td><input data-field="displayName" value="'+esc(user.display_name)+'"><span class="muted">'+(user.entra_oid?'Microsoft vinculado':'Pendiente de primer acceso Microsoft')+'</span></td><td><input data-field="email" type="email" placeholder="nombre@empresa.es" value="'+esc(user.email||'')+'"></td><td><select data-field="role"><option value="user">Usuario</option><option value="admin">Administrador</option></select></td><td><select data-field="active"><option value="1">Activo</option><option value="0">Desactivado</option></select></td><td><div class="apps">'+data.applications.map(function(app){const current=permission(user.id,app.code);return '<label class="perm"><input type="checkbox" data-app="'+esc(app.code)+'" '+(current&&Number(current.active)?'checked':'')+'><span>'+esc(app.name)+'</span></label>';}).join('')+'</div></td><td><div class="actions"><button data-save>Guardar</button><button class="secondary compact" data-sessions>Cerrar sesiones</button><button class="danger compact" data-delete>Borrar</button></div></td>';row.querySelector('[data-field="role"]').value=user.role;row.querySelector('[data-field="active"]').value=String(Number(user.active));row.querySelector('[data-save]').onclick=function(){saveUser(row,user);};row.querySelector('[data-sessions]').onclick=function(){closeUserSessions(user);};row.querySelector('[data-delete]').onclick=function(){removeUser(user);};body.appendChild(row);});}
+    function drawSessions(){const body=document.querySelector('#sessions');body.innerHTML='';if(!sessions.length){body.innerHTML='<tr><td colspan="6" class="muted">No hay sesiones activas.</td></tr>';return;}sessions.forEach(function(session){const row=document.createElement('tr');row.innerHTML='<td><strong>'+esc(session.display_name)+'</strong><br><span class="muted">'+esc(session.email||'')+'</span></td><td><span class="device">'+esc(device(session.user_agent))+'</span><br><span class="muted">Microsoft</span></td><td>'+date(session.created_at)+'</td><td>'+date(session.last_seen_at)+'</td><td>'+date(session.expires_at)+'</td><td>'+(session.current?'<span class="tag current">Esta sesión</span>':'<button class="danger compact" data-close>Cerrar</button>')+'</td>';const button=row.querySelector('[data-close]');if(button)button.onclick=function(){closeSession(session);};body.appendChild(row);});}
+    function drawActivity(){const body=document.querySelector('#activity');body.innerHTML='';if(!events.length){body.innerHTML='<tr><td colspan="5" class="muted">Todavía no hay actividad registrada.</td></tr>';return;}events.forEach(function(event){const row=document.createElement('tr');row.innerHTML='<td>'+date(event.created_at)+'</td><td><strong>'+esc(event.actor_name||'Sistema')+'</strong><br><span class="muted">'+esc(event.actor_email||'')+'</span></td><td><span class="event">'+esc(actionLabel(event.action))+'</span></td><td>'+esc(event.target_type||'')+(event.target_id?' · '+esc(event.target_id):'')+'</td><td class="detail">'+esc(detailText(event))+'</td>';body.appendChild(row);});}
+    async function api(path,options){const response=await fetch(path,options);if(!response.ok){let problem={};try{problem=await response.json();}catch(_){}throw new Error(problem.error||'No se pudo completar la operación.');}return response.json();}
+    async function loadUsers(){data=await api('/api/admin/users');drawUsers();}
+    async function loadSessions(){const result=await api('/api/admin/sessions');sessions=result.sessions||[];drawSessions();}
+    async function loadActivity(){const result=await api('/api/admin/activity');events=result.events||[];drawActivity();}
+    async function saveUser(row,user){try{const body={id:user.id,displayName:row.querySelector('[data-field="displayName"]').value,email:row.querySelector('[data-field="email"]').value,legacyUsername:user.legacy_username||'',role:row.querySelector('[data-field="role"]').value,active:row.querySelector('[data-field="active"]').value==='1'};await api('/api/admin/users',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});for(const app of data.applications){await api('/api/admin/permissions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({userId:user.id,applicationCode:app.code,role:'user',active:row.querySelector('[data-app="'+app.code+'"]').checked})});}show('Cambios guardados y aplicados.');await Promise.all([loadUsers(),loadSessions(),loadActivity()]);}catch(error){show(error.message);}}
+    async function closeSession(session){if(!confirm('¿Cerrar la sesión de '+session.display_name+'?'))return;try{await api('/api/admin/sessions/'+session.id,{method:'DELETE'});show('Sesión cerrada.');await Promise.all([loadSessions(),loadActivity()]);}catch(error){show(error.message);}}
+    async function closeUserSessions(user){if(!confirm('¿Cerrar todas las sesiones de '+user.display_name+'?'))return;try{const result=await api('/api/admin/users/'+user.id+'/sessions',{method:'DELETE'});show((result.count||0)+' sesiones cerradas.');await Promise.all([loadSessions(),loadActivity()]);}catch(error){show(error.message);}}
+    async function removeUser(user){if(!confirm('¿Borrar definitivamente a '+user.display_name+'? Se eliminarán sus permisos y sesiones.'))return;try{await api('/api/admin/users/'+user.id,{method:'DELETE'});show('Usuario borrado.');await Promise.all([loadUsers(),loadSessions(),loadActivity()]);}catch(error){show(error.message);}}
+    document.querySelectorAll('[data-tab]').forEach(function(button){button.onclick=function(){document.querySelectorAll('[data-tab]').forEach(function(item){item.classList.toggle('active',item===button);});document.querySelectorAll('[data-section]').forEach(function(section){section.classList.toggle('hidden',section.dataset.section!==button.dataset.tab);});};});
+    document.querySelector('#newUser').onclick=async function(){const displayName=prompt('Nombre del usuario');if(!displayName)return;const email=prompt('Correo corporativo de Microsoft')||'';try{await api('/api/admin/users',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({displayName:displayName,email:email,role:'user',active:true})});show('Usuario creado.');await Promise.all([loadUsers(),loadActivity()]);}catch(error){show(error.message);}};
+    document.querySelector('#closeOtherSessions').onclick=async function(){if(!confirm('¿Cerrar tus demás sesiones y mantener solamente esta?'))return;try{const result=await api('/api/admin/sessions',{method:'DELETE'});show((result.count||0)+' sesiones cerradas.');await Promise.all([loadSessions(),loadActivity()]);}catch(error){show(error.message);}};
+    document.querySelector('#refreshActivity').onclick=function(){loadActivity().catch(function(error){show(error.message);});};
+    Promise.all([loadUsers(),loadSessions(),loadActivity()]).catch(function(error){show(error.message);});
+  </script>
+</body>
+</html>`;
+}
+
 function renderAdminPage(user) {
   const safeName = escapeHtml(user.displayName || user.username || "Administrador");
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Usuarios y permisos</title><style>
@@ -437,6 +621,7 @@ function normalizeUser(row) {
     tenantId: row.entra_tenant_id || "",
     oid: row.entra_oid || "",
     provider: row.provider || row.auth_provider || "local",
+    sessionId: Number(row.session_id || 0),
   };
 }
 
@@ -447,6 +632,11 @@ function entraEnabled(env) {
 function sanitizeNextPath(value) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
   return value;
+}
+
+function sameOrigin(request) {
+  const origin = request.headers.get("origin");
+  return !origin || origin === new URL(request.url).origin;
 }
 
 function readCookie(request, name) {
