@@ -29,6 +29,13 @@ export async function handleAuthRoute(request, env, renderers) {
     return launchApplication(request, env, applicationLaunchMatch[1]);
   }
 
+  if (url.pathname === "/api/sso/calendario/exchange" && request.method === "POST") {
+    return exchangeCalendarCode(request, env);
+  }
+  if (url.pathname === "/api/sso/calendario/introspect" && request.method === "POST") {
+    return introspectCalendarAccess(request, env);
+  }
+
   if (url.pathname === MICROSOFT_START_PATH && request.method === "GET") {
     return beginMicrosoftLogin(request, env);
   }
@@ -86,6 +93,64 @@ async function launchApplication(request, env, applicationCode) {
   destination.search = new URLSearchParams({ code }).toString();
   destination.hash = "";
   return redirect(destination.toString(), { "cache-control": "no-store", "referrer-policy": "no-referrer" });
+}
+
+async function exchangeCalendarCode(request, env) {
+  const authenticationError = await requireCalendarService(request, env);
+  if (authenticationError) return authenticationError;
+  const payload = await request.json().catch(() => null);
+  const code = String(payload?.code || "").trim();
+  if (!code) return json({ error: "Código de acceso no válido" }, 400);
+
+  const loginCode = await env.AUTH_DB.prepare(`
+    DELETE FROM login_codes
+    WHERE code_hash = ? AND application_code = 'calendario-eventos' AND expires_at > CURRENT_TIMESTAMP
+    RETURNING user_id
+  `).bind(await sha256Text(code)).first();
+  if (!loginCode) return json({ error: "El acceso ha caducado o ya fue utilizado" }, 403);
+
+  const user = await calendarAuthorizedUser(env, Number(loginCode.user_id));
+  if (!user) return json({ error: "Acceso no autorizado" }, 403);
+  return json({ user: publicCalendarUser(user) });
+}
+
+async function introspectCalendarAccess(request, env) {
+  const authenticationError = await requireCalendarService(request, env);
+  if (authenticationError) return authenticationError;
+  const payload = await request.json().catch(() => null);
+  const userId = Number(payload?.userId || 0);
+  if (!userId) return json({ error: "Usuario no válido" }, 400);
+  const user = await calendarAuthorizedUser(env, userId);
+  if (!user) return json({ active: false }, 403);
+  return json({ active: true, user: publicCalendarUser(user) });
+}
+
+async function calendarAuthorizedUser(env, userId) {
+  return env.AUTH_DB.prepare(`
+    SELECT u.id, u.display_name, u.email, u.role, p.role AS application_role
+    FROM users u
+    JOIN user_application_permissions p
+      ON p.user_id = u.id AND p.application_code = 'calendario-eventos'
+    WHERE u.id = ? AND u.active = 1 AND p.active = 1
+  `).bind(userId).first();
+}
+
+function publicCalendarUser(user) {
+  return {
+    id: Number(user.id),
+    displayName: user.display_name || user.email,
+    email: user.email || "",
+    role: user.application_role || "user",
+  };
+}
+
+async function requireCalendarService(request, env) {
+  const configuredSecret = String(env.CALENDARIO_SSO_SECRET || "");
+  if (!configuredSecret) return json({ error: "Integración del calendario no configurada" }, 503);
+  const authorization = String(request.headers.get("authorization") || "");
+  const providedSecret = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  if (!(await secureTextEqual(providedSecret, configuredSecret))) return json({ error: "Servicio no autorizado" }, 401);
+  return null;
 }
 
 export async function logoutResponse(request, env, destination = "/login") {
@@ -405,6 +470,16 @@ function randomToken(length) {
 
 async function sha256Text(value) {
   return base64Url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+
+async function secureTextEqual(left, right) {
+  const [leftHash, rightHash] = await Promise.all([sha256Text(left), sha256Text(right)]);
+  if (leftHash.length !== rightHash.length) return false;
+  let difference = 0;
+  for (let index = 0; index < leftHash.length; index += 1) {
+    difference |= leftHash.charCodeAt(index) ^ rightHash.charCodeAt(index);
+  }
+  return difference === 0;
 }
 
 function base64Url(value) {

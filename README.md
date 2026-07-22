@@ -104,6 +104,16 @@ npx wrangler d1 execute portal-camara-auth --remote --file .\schema-auth.sql
 npx wrangler d1 execute portal-camara-auth --remote --file .\migration-seed-legacy-users.sql
 ```
 
+## Calendario alojado en otra cuenta
+
+El calendario utiliza los endpoints internos `/api/sso/calendario/exchange` y `/api/sso/calendario/introspect`. Como está desplegado en otra cuenta de Cloudflare, ambos Workers deben compartir un secreto configurado de forma interactiva:
+
+```powershell
+npx wrangler secret put CALENDARIO_SSO_SECRET
+```
+
+El mismo valor se configura en el Worker del calendario como `PORTAL_SSO_SECRET`. Este valor nunca debe guardarse en GitHub.
+
 ## Seguridad
 
 No subas secretos, tokens, contraseñas ni claves privadas al repositorio.
