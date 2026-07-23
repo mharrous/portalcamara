@@ -325,7 +325,7 @@ function escapeHtml(value) {
 }
 
 const PORTAL_THEMES = [
-  { id: "copper", name: "Cobre", colors: ["#303a4b", "#6f5f61", "#c89a82"] },
+  { id: "copper", name: "Plata", colors: ["#3f4650", "#7f8995", "#d2d5d9"] },
   { id: "ocean", name: "Océano", colors: ["#233847", "#537889", "#b4b5b2"] },
   { id: "ceuta", name: "Ceuta", colors: ["#482b31", "#8e5550", "#d6b58b"] },
   { id: "forest", name: "Bosque", colors: ["#273b37", "#60776a", "#b5a581"] },
@@ -350,7 +350,7 @@ function themePickerMarkup(placement) {
 
 function themeStyles() {
   return `
-    :root { --theme-1:#303a4b;--theme-2:#495465;--theme-3:#6f5f61;--theme-4:#9a6d5a;--theme-5:#c89a82;--theme-glow-a:#73839a;--theme-glow-b:#c99a80; }
+    :root { --theme-1:#3f4650;--theme-2:#5d6672;--theme-3:#7f8995;--theme-4:#a6adb5;--theme-5:#d2d5d9;--theme-glow-a:#aeb6c1;--theme-glow-b:#e3e5e8; }
     :root[data-theme="ocean"] { --theme-1:#233847;--theme-2:#355565;--theme-3:#537889;--theme-4:#789aaa;--theme-5:#b4b5b2;--theme-glow-a:#6f93a1;--theme-glow-b:#b9aaa4; }
     :root[data-theme="ceuta"] { --theme-1:#482b31;--theme-2:#6a3e43;--theme-3:#8e5550;--theme-4:#b18260;--theme-5:#d6b58b;--theme-glow-a:#9b5e59;--theme-glow-b:#c6a47e; }
     :root[data-theme="forest"] { --theme-1:#273b37;--theme-2:#3d5750;--theme-3:#60776a;--theme-4:#86907a;--theme-5:#b5a581;--theme-glow-a:#668478;--theme-glow-b:#aa9d7d; }
