@@ -1449,7 +1449,8 @@ function renderHtml(sessionUser, projects = [], portalSections = [], sectionProj
       <input id="cardCode" name="cardCode" type="hidden">
       <label class="card-editor-field"><span>Nombre</span><input id="cardName" name="cardName" required maxlength="80" placeholder="Portal jornadas"></label>
       <label class="card-editor-field"><span>Etiqueta</span><input id="cardLabel" name="cardLabel" required maxlength="40" placeholder="Jornadas"></label>
-      <label class="card-editor-field"><span>Ruta</span><input id="cardUrl" name="cardUrl" type="url" required placeholder="https://..."></label>
+      <label class="card-editor-field"><span>Ruta</span><input id="cardUrl" name="cardUrl" type="url" required placeholder="https://... o http://192.168.x.x"></label>
+      <p class="card-editor-help">Se admite <code>https://</code> para páginas públicas y <code>http://</code> para direcciones internas de la oficina.</p>
       <p class="card-editor-help">La tarjeta se guardará en la sección que estás viendo. Después podrás asignarla a otros usuarios desde Administración.</p>
       <p class="card-editor-error" id="cardEditorError" role="alert" hidden></p>
       <div class="card-editor-actions">

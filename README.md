@@ -9,7 +9,7 @@ Los administradores pueden gestionar las tarjetas directamente desde el portal:
 1. Entra con una cuenta administradora.
 2. Abre el portal principal, `Portal innovación` o `Soporte informático`.
 3. Pulsa `Editar` y después `Añadir tarjeta`.
-4. Introduce el nombre, la categoría y una URL que empiece por `https://`.
+4. Introduce el nombre, la categoría y una URL `https://`. Para servicios internos también se admite `http://` con IP privada o nombre local.
 5. Asigna la nueva aplicación a los usuarios desde `Usuarios`.
 
 Las tarjetas creadas dentro de `Soporte informático` se guardan únicamente en esa sección.

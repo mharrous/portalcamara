@@ -111,7 +111,7 @@ async function launchApplication(request, env, applicationCode) {
   }
 
   const destination = new URL(application.url);
-  if (destination.protocol !== "https:") return new Response("Destino no válido", { status: 500 });
+  if (!isAllowedApplicationUrl(destination)) return new Response("Destino no válido", { status: 500 });
   if (application.integration_status === "direct") {
     await audit(env, user.id, "application.launch", "application", application.code, { mode: "direct" });
     return redirect(destination.toString(), { "cache-control": "no-store", "referrer-policy": "no-referrer" });
@@ -522,6 +522,30 @@ export function normalizePortalSection(value) {
   return allowedSections.has(section) ? section : "root";
 }
 
+function isInternalHostname(hostname) {
+  const host = String(hostname || "").replace(/^\[|\]$/g, "").toLowerCase();
+  if (!host) return false;
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".lan") || host.endsWith(".internal")) return true;
+  if (!host.includes(".") && !host.includes(":")) return true;
+
+  const ipv4 = host.split(".").map(Number);
+  if (ipv4.length === 4 && ipv4.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)) {
+    return ipv4[0] === 10
+      || ipv4[0] === 127
+      || (ipv4[0] === 169 && ipv4[1] === 254)
+      || (ipv4[0] === 172 && ipv4[1] >= 16 && ipv4[1] <= 31)
+      || (ipv4[0] === 192 && ipv4[1] === 168);
+  }
+
+  return host.includes(":") && (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || /^fe[89ab]/.test(host));
+}
+
+export function isAllowedApplicationUrl(destination) {
+  const url = destination instanceof URL ? destination : new URL(String(destination || ""));
+  if (url.username || url.password) return false;
+  return url.protocol === "https:" || (url.protocol === "http:" && isInternalHostname(url.hostname));
+}
+
 async function saveApplication(request, env, admin) {
   const payload = await request.json();
   const existingCode = String(payload.code || "").trim();
@@ -535,7 +559,9 @@ async function saveApplication(request, env, admin) {
     throw new Error("La ruta debe ser una URL completa válida.");
   }
   if (!name || !label) throw new Error("El nombre y la etiqueta son obligatorios.");
-  if (destination.protocol !== "https:") throw new Error("La ruta debe comenzar por https://");
+  if (!isAllowedApplicationUrl(destination)) {
+    throw new Error("Usa https:// o una dirección interna http:// (por ejemplo, 192.168.x.x).");
+  }
 
   if (existingCode) {
     if (!/^[a-z0-9-]+$/.test(existingCode)) throw new Error("Código de tarjeta no válido.");
