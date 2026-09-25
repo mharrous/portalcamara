@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS applications (
   name TEXT NOT NULL,
   category TEXT NOT NULL,
   label TEXT,
-  portal_section TEXT NOT NULL DEFAULT 'root' CHECK (portal_section IN ('root', 'innovacion')),
+  portal_section TEXT NOT NULL DEFAULT 'root' CHECK (portal_section IN ('root', 'innovacion', 'soporte-informatico')),
   sort_order INTEGER NOT NULL DEFAULT 0,
   url TEXT NOT NULL,
   active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),

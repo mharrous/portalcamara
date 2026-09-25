@@ -516,12 +516,18 @@ function applicationSlug(value) {
     .slice(0, 48) || "aplicacion";
 }
 
+export function normalizePortalSection(value) {
+  const allowedSections = new Set(["root", "innovacion", "soporte-informatico"]);
+  const section = String(value || "").trim().toLowerCase();
+  return allowedSections.has(section) ? section : "root";
+}
+
 async function saveApplication(request, env, admin) {
   const payload = await request.json();
   const existingCode = String(payload.code || "").trim();
   const name = String(payload.name || "").trim().slice(0, 100);
   const label = String(payload.label || "").trim().slice(0, 40);
-  const portalSection = payload.portalSection === "innovacion" ? "innovacion" : "root";
+  const portalSection = normalizePortalSection(payload.portalSection);
   let destination;
   try {
     destination = new URL(String(payload.url || "").trim());

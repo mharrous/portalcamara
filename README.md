@@ -4,25 +4,15 @@ Portal de tarjetas para acceder a los proyectos web de la Cámara de Comercio de
 
 ## Cómo añadir una tarjeta
 
-Edita `worker.js` y cambia la lista `PROYECTOS`, que está al principio del archivo.
+Los administradores pueden gestionar las tarjetas directamente desde el portal:
 
-Ejemplo:
+1. Entra con una cuenta administradora.
+2. Abre el portal principal, `Portal innovación` o `Soporte informático`.
+3. Pulsa `Editar` y después `Añadir tarjeta`.
+4. Introduce el nombre, la categoría y una URL que empiece por `https://`.
+5. Asigna la nueva aplicación a los usuarios desde `Usuarios`.
 
-```js
-{
-  nombre: "Nuevo Proyecto",
-  categoria: "Interno",
-  url: "https://nuevo-proyecto.workers.dev/",
-  estado: "activo",
-},
-```
-
-Campos:
-
-- `nombre`: título visible de la tarjeta.
-- `categoria`: texto de categoría/filtro.
-- `url`: enlace completo. Si aún no existe, déjalo como `""`.
-- `estado`: usa `"activo"` o `"proximamente"`.
+Las tarjetas creadas dentro de `Soporte informático` se guardan únicamente en esa sección.
 
 ## Worker definitivo
 

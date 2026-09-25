@@ -69,23 +69,34 @@ export default {
       estado: "activo",
       editable: true,
     });
-    const innovationProjects = applicationRows
-      .filter((application) => application.portal_section === "innovacion")
-      .map(cardForApplication);
+    const portalSections = [
+      { id: "innovacion", name: "Portal innovación", category: "Innovación" },
+      { id: "soporte-informatico", name: "Soporte informático", category: "Informática" },
+    ];
+    const sectionProjects = Object.fromEntries(portalSections.map((section) => [
+      section.id,
+      applicationRows
+        .filter((application) => application.portal_section === section.id)
+        .map(cardForApplication),
+    ]));
     const projects = applicationRows
-      .filter((application) => application.portal_section !== "innovacion")
+      .filter((application) => application.portal_section === "root")
       .map(cardForApplication);
-    if (innovationProjects.length) {
-      projects.push({
-        codigo: "innovacion",
-        nombre: "Portal innovación",
-        categoria: "Innovación",
-        url: "#innovacion",
-        estado: "activo",
-        editable: false,
-      });
-    }
-    return htmlResponse(renderHtml(sessionUser, projects, innovationProjects));
+
+    portalSections.forEach((section) => {
+      if (sessionUser.role === "admin" || sectionProjects[section.id].length) {
+        projects.push({
+          codigo: section.id,
+          nombre: section.name,
+          categoria: section.category,
+          url: `#${section.id}`,
+          estado: "activo",
+          editable: false,
+        });
+      }
+    });
+
+    return htmlResponse(renderHtml(sessionUser, projects, portalSections, sectionProjects));
   },
 };
 
@@ -476,9 +487,10 @@ function renderAuthShell({ title, body }) {
 </html>`;
 }
 
-function renderHtml(sessionUser, projects = [], innovationProjects = []) {
+function renderHtml(sessionUser, projects = [], portalSections = [], sectionProjects = {}) {
   const proyectosJson = JSON.stringify(projects, null, 2).replace(/</g, "\u003c");
-  const innovacionJson = JSON.stringify(innovationProjects, null, 2).replace(/</g, "\u003c");
+  const portalSectionsJson = JSON.stringify(portalSections, null, 2).replace(/</g, "\u003c");
+  const sectionProjectsJson = JSON.stringify(sectionProjects, null, 2).replace(/</g, "\u003c");
   const sessionLabel = escapeHtml(sessionUser?.displayName || sessionUser?.username || "Usuario");
   const sessionInitials = escapeHtml(
     String(sessionUser?.displayName || sessionUser?.username || "Usuario")
@@ -1449,7 +1461,8 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
 
   <script>
     const PROYECTOS = ${proyectosJson};
-    const INNOVACION = ${innovacionJson};
+    const PORTAL_SECTIONS = ${portalSectionsJson};
+    const SECTION_PROJECTS = ${sectionProjectsJson};
     const CAN_EDIT_CARDS = ${canEditCards ? "true" : "false"};
     const gridContainer = document.getElementById("projectGrid");
     const searchInput = document.getElementById("searchInput");
@@ -1492,12 +1505,19 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
       return projectIsActive(project) ? "En línea" : "Próximamente";
     }
 
-    function isInnovationView() {
-      return window.location.hash === "#innovacion";
+    function currentSectionId() {
+      const sectionId = window.location.hash.replace(/^#/, "");
+      return PORTAL_SECTIONS.some(function(section) { return section.id === sectionId; }) ? sectionId : "";
+    }
+
+    function currentSection() {
+      const sectionId = currentSectionId();
+      return PORTAL_SECTIONS.find(function(section) { return section.id === sectionId; }) || null;
     }
 
     function currentProjects() {
-      return isInnovationView() ? INNOVACION : PROYECTOS;
+      const sectionId = currentSectionId();
+      return sectionId ? (SECTION_PROJECTS[sectionId] || []) : PROYECTOS;
     }
 
     function isInternalProject(project) {
@@ -1582,7 +1602,7 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
     }
 
     function currentPortalSection() {
-      return isInnovationView() ? "innovacion" : "root";
+      return currentSectionId() || "root";
     }
 
     function openCardEditor(project) {
@@ -1655,7 +1675,8 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
     }
 
     function renderProjects() {
-      const viewKey = isInnovationView() ? "innovacion" : "portal";
+      const section = currentSection();
+      const viewKey = section ? section.id : "portal";
       const projectsSource = currentProjects();
 
       if (categoryFilter.dataset.view !== viewKey) {
@@ -1664,8 +1685,8 @@ function renderHtml(sessionUser, projects = [], innovationProjects = []) {
         fillCategoryFilter(projectsSource);
       }
 
-      portalTitle.textContent = isInnovationView() ? "Portal innovación" : "Portal";
-      backButton.hidden = !isInnovationView();
+      portalTitle.textContent = section ? section.name : "Portal";
+      backButton.hidden = !section;
 
       const projects = filteredProjects();
       gridContainer.innerHTML = "";
